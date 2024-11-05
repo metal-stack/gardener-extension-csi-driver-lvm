@@ -1,0 +1,15 @@
+apiVersion: core.gardener.cloud/v1beta1
+kind: ControllerRegistration
+metadata:
+  name: csi-driver-lvm
+spec:
+  deployment:
+    policy: Always
+  resources:
+  - kind: Extension
+    type: csi-driver-lvm
+    globallyEnabled: true
+    lifecycle:
+      delete: BeforeKubeAPIServer
+      migrate: BeforeKubeAPIServer
+      reconcile: BeforeKubeAPIServer

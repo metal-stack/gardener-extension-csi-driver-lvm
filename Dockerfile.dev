@@ -1,0 +1,3 @@
+FROM alpine:3.20
+COPY bin/gardener-extension-csi-driver-lvm /gardener-extension-csi-driver-lvm
+CMD ["/gardener-extension-csi-driver-lvm"]

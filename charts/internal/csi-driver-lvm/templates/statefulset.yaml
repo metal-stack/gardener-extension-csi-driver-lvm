@@ -1,0 +1,77 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-driver-lvm-controller
+spec:
+  serviceName: csi-driver-lvm-controller
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-driver-lvm-controller
+  template:
+    metadata:
+      labels:
+        app: csi-driver-lvm-controller
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - csi-driver-lvm-plugin
+            topologyKey: kubernetes.io/hostname
+{{- if .Values.nodeSelector.provisioner }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector.provisioner | indent 8 }}
+{{- end }}
+{{- if .Values.tolerations.provisioner }}
+      tolerations:
+{{ toYaml .Values.tolerations.provisioner | indent 8 }}
+{{- end }}
+      serviceAccountName: csi-driver-lvm-controller
+      containers:
+        - name: csi-attacher
+          image: {{ .Values.sidecarImages.attacher }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - --v=5
+            - --csi-address=/csi/csi.sock
+          securityContext:
+            readOnlyRootFilesystem: true
+            privileged: true
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+        - name: csi-provisioner
+          image: {{ .Values.sidecarImages.provisioner }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - -v=5
+            - --csi-address=/csi/csi.sock
+            - --feature-gates=Topology=true
+          securityContext:
+            readOnlyRootFilesystem: true
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+        - name: csi-resizer
+          image: {{ .Values.sidecarImages.resizer }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - -v=5
+            - -csi-address=/csi/csi.sock
+          securityContext:
+            readOnlyRootFilesystem: true
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+      volumes:
+        - hostPath:
+            path: {{ .Values.kubernetes.kubeletPath }}/plugins/csi-driver-lvm
+            type: DirectoryOrCreate
+          name: socket-dir

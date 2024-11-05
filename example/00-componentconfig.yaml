@@ -1,0 +1,5 @@
+---
+apiVersion: csi-driver-lvm.metal.extensions.config.gardener.cloud/v1alpha1
+kind: ControllerConfiguration
+auth:
+  providerTenant: a-tenant
