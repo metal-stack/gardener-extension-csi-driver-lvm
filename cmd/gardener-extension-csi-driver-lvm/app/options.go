@@ -10,9 +10,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
+	heartbeatcontroller "github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
 	heartbeatcmd "github.com/gardener/gardener/extensions/pkg/controller/heartbeat/cmd"
 	webhookcmd "github.com/gardener/gardener/extensions/pkg/webhook/cmd"
 	csidriverlvmcmd "github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/cmd"
+	controller "github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/controller/csi-driver-lvm"
 
 	controllercmd "github.com/gardener/gardener/extensions/pkg/controller/cmd"
 	"github.com/gardener/gardener/extensions/pkg/util"
@@ -127,8 +129,6 @@ func (options *Options) run(ctx context.Context) error {
 		},
 	}
 
-	//TODO check ALL options ->
-
 	mgr, err := manager.New(options.restOptions.Completed().Config, mgrOpts)
 	if err != nil {
 		return fmt.Errorf("could not instantiate controller-manager: %w", err)
@@ -149,6 +149,20 @@ func (options *Options) run(ctx context.Context) error {
 	}
 
 	log.Info("added mgr-schme to installation")
+
+	ctrlConfig := options.csidriverlvmOptions.Completed()
+	ctrlConfig.Apply(&controller.DefaultAddOptions.Config)
+	options.controllerOptions.Completed().Apply(&controller.DefaultAddOptions.ControllerOptions)
+	options.reconcileOptions.Completed().Apply(&controller.DefaultAddOptions.IgnoreOperationAnnotation)
+	options.heartbeatOptions.Completed().Apply(&heartbeatcontroller.DefaultAddOptions)
+
+	if err := options.controllerSwitches.Completed().AddToManager(ctx, mgr); err != nil {
+		return fmt.Errorf("could not add controllers to manager: %w", err)
+	}
+
+	if _, err := options.webhookOptions.Completed().AddToManager(ctx, mgr, nil); err != nil {
+		return fmt.Errorf("could not add the mutating webhook to manager: %w", err)
+	}
 
 	if err := mgr.AddReadyzCheck("informer-sync", ghealth.NewCacheSyncHealthz(mgr.GetCache())); err != nil {
 		return fmt.Errorf("could not add ready check for informers: %w", err)
