@@ -12,7 +12,6 @@ import (
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	heartbeatcontroller "github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
 	heartbeatcmd "github.com/gardener/gardener/extensions/pkg/controller/heartbeat/cmd"
-	webhookcmd "github.com/gardener/gardener/extensions/pkg/webhook/cmd"
 	csidriverlvmcmd "github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/cmd"
 	controller "github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/controller/csi-driver-lvm"
 
@@ -37,27 +36,12 @@ type Options struct {
 	controllerOptions   *controllercmd.ControllerOptions
 	heartbeatOptions    *heartbeatcmd.Options
 	healthOptions       *controllercmd.ControllerOptions
-	webhookOptions      *webhookcmd.AddToManagerOptions
 	controllerSwitches  *controllercmd.SwitchOptions
 	reconcileOptions    *controllercmd.ReconcilerOptions
 	optionAggregator    controllercmd.OptionAggregator
 }
 
 func NewOptions() *Options {
-	// options for the webhook server
-	webhookServerOptions := &webhookcmd.ServerOptions{
-		Namespace: os.Getenv("WEBHOOK_CONFIG_NAMESPACE"),
-	}
-
-	webhookSwitches := csidriverlvmcmd.WebhookSwitchOptions()
-	webhookOptions := webhookcmd.NewAddToManagerOptions(
-		"csi-driver-lvm",
-		"",
-		nil,
-		webhookServerOptions,
-		webhookSwitches,
-	)
-
 	options := &Options{
 		generalOptions:      &controllercmd.GeneralOptions{},
 		csidriverlvmOptions: &csidriverlvmcmd.AuthOptions{},
@@ -87,7 +71,6 @@ func NewOptions() *Options {
 		},
 		controllerSwitches: csidriverlvmcmd.ControllerSwitchOptions(),
 		reconcileOptions:   &controllercmd.ReconcilerOptions{},
-		webhookOptions:     webhookOptions,
 	}
 
 	options.optionAggregator = controllercmd.NewOptionAggregator(
@@ -100,7 +83,6 @@ func NewOptions() *Options {
 		controllercmd.PrefixOption("healthcheck-", options.healthOptions),
 		options.controllerSwitches,
 		options.reconcileOptions,
-		options.webhookOptions,
 	)
 
 	return options
@@ -152,16 +134,13 @@ func (options *Options) run(ctx context.Context) error {
 
 	ctrlConfig := options.csidriverlvmOptions.Completed()
 	ctrlConfig.Apply(&controller.DefaultAddOptions.Config)
+
 	options.controllerOptions.Completed().Apply(&controller.DefaultAddOptions.ControllerOptions)
 	options.reconcileOptions.Completed().Apply(&controller.DefaultAddOptions.IgnoreOperationAnnotation)
 	options.heartbeatOptions.Completed().Apply(&heartbeatcontroller.DefaultAddOptions)
 
 	if err := options.controllerSwitches.Completed().AddToManager(ctx, mgr); err != nil {
 		return fmt.Errorf("could not add controllers to manager: %w", err)
-	}
-
-	if _, err := options.webhookOptions.Completed().AddToManager(ctx, mgr, nil); err != nil {
-		return fmt.Errorf("could not add the mutating webhook to manager: %w", err)
 	}
 
 	if err := mgr.AddReadyzCheck("informer-sync", ghealth.NewCacheSyncHealthz(mgr.GetCache())); err != nil {

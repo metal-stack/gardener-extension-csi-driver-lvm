@@ -15,7 +15,6 @@ controllers:
   ignoreOperationAnnotation: false
 
 disableControllers: []
-disableWebhooks: []
 
 # imageVectorOverwrite: |
 #   images:
@@ -30,9 +29,6 @@ disableWebhooks: []
 #     tag: "3.1"
 #     version: ">= 1.12"
 #   ...
-
-webhookConfig:
-  serverPort: 443
 
 config:
   clientConnection:
