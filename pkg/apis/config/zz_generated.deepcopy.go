@@ -18,13 +18,13 @@ import (
 func (in *ControllerConfiguration) DeepCopyInto(out *ControllerConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.DevicePattern != nil {
-		in, out := &in.DevicePattern, &out.DevicePattern
+	if in.DefaultDevicePattern != nil {
+		in, out := &in.DefaultDevicePattern, &out.DefaultDevicePattern
 		*out = new(string)
 		**out = **in
 	}
-	if in.HostWritePath != nil {
-		in, out := &in.HostWritePath, &out.HostWritePath
+	if in.DefaultHostWritePath != nil {
+		in, out := &in.DefaultHostWritePath, &out.DefaultHostWritePath
 		*out = new(string)
 		**out = **in
 	}

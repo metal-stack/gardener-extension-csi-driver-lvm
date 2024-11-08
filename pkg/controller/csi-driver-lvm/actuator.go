@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
-	"github.com/gardener/gardener/imagevector"
 
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/config"
 	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csidriverlvm/v1alpha1"
+	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/imagevector"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -58,12 +58,23 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		}
 	}
 
+	var hostwritepath = csidriverlvmConfig.HostWritePath
+	var devicepattern = csidriverlvmConfig.DevicePattern
+
+	if hostwritepath == nil {
+		csidriverlvmConfig.HostWritePath = a.config.DefaultHostWritePath
+	}
+
+	if devicepattern == nil {
+		csidriverlvmConfig.DevicePattern = a.config.DefaultDevicePattern
+	}
+
 	controllerObjects, err := a.controllerObjects(namespace)
 	if err != nil {
 		return err
 	}
 
-	pluginObjects, err := a.pluginObjects(namespace)
+	pluginObjects, err := a.pluginObjects(namespace, csidriverlvmConfig, log)
 	if err != nil {
 		return err
 	}
@@ -321,7 +332,7 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 	return objects, nil
 }
 
-func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
+func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig, log logr.Logger) ([]client.Object, error) {
 
 	csidriverlvmDriver := &storagev1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
@@ -475,7 +486,7 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 		return nil, fmt.Errorf("failed to find csi-driver-lvm-provisioner image: %w", err)
 	}
 
-	var terminationPolicy corev1.TerminationMessagePolicy = corev1.TerminationMessageReadFile
+	// var terminationPolicy corev1.TerminationMessagePolicy = corev1.TerminationMessageReadFile
 	var mountPropagation corev1.MountPropagationMode = corev1.MountPropagationBidirectional
 
 	var hostPathTypeCreate corev1.HostPathType = corev1.HostPathDirectoryOrCreate
@@ -506,12 +517,12 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 					NodeSelector:       map[string]string{},
 					Containers: []corev1.Container{
 						{
-							Name:            "node-driver-registrar",
+							Name:            "csi-node-driver-registrar",
 							Image:           csiNodeDriverRegistrarImage.String(),
 							ImagePullPolicy: "IfNotPresent",
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--kubelet-registration-path=/var/lib/kubelet/plugins/csi-driver-lvm/csi.sock"},
 							SecurityContext: &corev1.SecurityContext{
-								ReadOnlyRootFilesystem: pointer.Pointer(true),
+								ReadOnlyRootFilesystem: pointer.Pointer(false),
 								// Privileged:             pointer.Pointer(true),
 							},
 							Env: []corev1.EnvVar{
@@ -525,8 +536,8 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 									},
 								},
 							},
-							TerminationMessagePath:   "/dev/termination-log",
-							TerminationMessagePolicy: terminationPolicy,
+							// TerminationMessagePath:   "/dev/termination-log",
+							// TerminationMessagePolicy: terminationPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
 								{MountPath: "/var/lib/kubelet/plugins/csi-driver-lvm/csi.sock", Name: "socket-dir"},
@@ -540,8 +551,8 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 							Args: []string{
 								"--drivername=lvm.csi.metal-stack.io",
 								"--endpoint=unix:///csi/csi.sock",
-								"--hostwritepath=" + *a.config.HostWritePath,
-								"--devices=" + *a.config.DevicePattern,
+								"--hostwritepath=" + pointer.SafeDeref(csidriverlvmConfig.HostWritePath),
+								"--devices=" + pointer.SafeDeref(csidriverlvmConfig.HostWritePath),
 								"--nodeid=$(KUBE_NODE_NAME)",
 								"--vgname=csi-lvm",
 								"--namespace=kube-system",
@@ -549,7 +560,7 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 								"--pullpolicy=IfNotPresent",
 							},
 							SecurityContext: &corev1.SecurityContext{
-								ReadOnlyRootFilesystem: pointer.Pointer(true),
+								ReadOnlyRootFilesystem: pointer.Pointer(false),
 								Privileged:             pointer.Pointer(true),
 							},
 							Env: []corev1.EnvVar{
@@ -582,8 +593,8 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 								Protocol:      corev1.ProtocolTCP,
 								ContainerPort: 9898,
 							}},
-							TerminationMessagePath:   "/dev/termination-log",
-							TerminationMessagePolicy: terminationPolicy,
+							// TerminationMessagePath:   "/dev/termination-log",
+							// TerminationMessagePolicy: terminationPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
 								{MountPath: "/var/lib/kubelet/pods", Name: "mountpoint-dir", MountPropagation: &mountPropagation},
@@ -607,8 +618,8 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
 							},
-							TerminationMessagePath:   "/dev/termination-log",
-							TerminationMessagePolicy: terminationPolicy,
+							// TerminationMessagePath:   "/dev/termination-log",
+							// TerminationMessagePolicy: terminationPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
 							},
@@ -672,7 +683,7 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 							Name: "lvmcache",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: *a.config.HostWritePath + "/cache",
+									Path: pointer.SafeDeref(csidriverlvmConfig.HostWritePath) + "/cache",
 									Type: &hostPathTypeCreate,
 								},
 							},
@@ -681,7 +692,7 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 							Name: "lvmarchive",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: *a.config.HostWritePath + "/archive",
+									Path: pointer.SafeDeref(csidriverlvmConfig.HostWritePath) + "/archive",
 									Type: &hostPathTypeCreate,
 								},
 							},
@@ -690,7 +701,7 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 							Name: "lvmbackup",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: *a.config.HostWritePath + "/backup",
+									Path: pointer.SafeDeref(csidriverlvmConfig.HostWritePath) + "/backup",
 									Type: &hostPathTypeCreate,
 								},
 							},
@@ -699,7 +710,7 @@ func (a *actuator) pluginObjects(namespace string) ([]client.Object, error) {
 							Name: "lvmlock",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: *a.config.HostWritePath + "/lock",
+									Path: pointer.SafeDeref(csidriverlvmConfig.HostWritePath) + "/lock",
 									Type: &hostPathTypeCreate,
 								},
 							},

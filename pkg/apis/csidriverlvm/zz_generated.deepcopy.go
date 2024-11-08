@@ -17,6 +17,16 @@ import (
 func (in *CsiDriverLvmConfig) DeepCopyInto(out *CsiDriverLvmConfig) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.DevicePattern != nil {
+		in, out := &in.DevicePattern, &out.DevicePattern
+		*out = new(string)
+		**out = **in
+	}
+	if in.HostWritePath != nil {
+		in, out := &in.HostWritePath, &out.HostWritePath
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

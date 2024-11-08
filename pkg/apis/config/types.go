@@ -12,8 +12,8 @@ import (
 type ControllerConfiguration struct {
 	metav1.TypeMeta
 
-	DevicePattern *string
-	HostWritePath *string
+	DefaultDevicePattern *string
+	DefaultHostWritePath *string
 
 	// HealthCheckConfig is the config for the health check controller
 	HealthCheckConfig *healthcheckconfig.HealthCheckConfig

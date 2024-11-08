@@ -1,5 +1,0 @@
-apiVersion: v1
-appVersion: "1.0"
-description: A Helm chart for the csi-driver-lvm extension
-name: gardener-extension-csi-driver-lvm
-version: 0.2.0

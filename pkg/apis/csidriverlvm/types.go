@@ -9,4 +9,7 @@ import (
 // CsiDriverLvmConfig configuration resource
 type CsiDriverLvmConfig struct {
 	metav1.TypeMeta
+
+	DevicePattern *string
+	HostWritePath *string
 }

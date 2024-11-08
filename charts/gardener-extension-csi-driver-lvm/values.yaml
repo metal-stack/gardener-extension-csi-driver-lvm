@@ -37,5 +37,8 @@ config:
     qps: 100
     burst: 130
 
+  devicePattern: /dev/nvme[0-9]n[0-9]
+  defaultHostWritePath: /etc/lvm
+
 gardener:
   version: ""

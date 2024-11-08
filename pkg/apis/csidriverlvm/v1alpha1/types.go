@@ -13,4 +13,7 @@ const (
 // ControllerConfiguration configuration resource
 type CsiDriverLvmConfig struct {
 	metav1.TypeMeta `json:",inline"`
+
+	DevicePattern *string `json:"devicePattern,omitempty"`
+	HostWritePath *string `json:"hostWritePath,omitempty"`
 }

@@ -11,8 +11,8 @@ import (
 type ControllerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	DevicePattern *string `json:"devicePattern,omitempty"`
-	HostWritePath *string `json:"hostWritePath,omitempty"`
+	DefaultDevicePattern *string `json:"defaultDevicePattern,omitempty"`
+	DefaultHostWritePath *string `json:"defaultHostWritePath,omitempty"`
 
 	// HealthCheckConfig is the config for the health check controller
 	// +optional

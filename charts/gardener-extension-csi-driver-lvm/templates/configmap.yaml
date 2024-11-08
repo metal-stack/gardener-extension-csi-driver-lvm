@@ -17,4 +17,9 @@ data:
       qps: {{ required ".Values.config.clientConnection.qps is required" .Values.config.clientConnection.qps }}
       burst: {{ required ".Values.config.clientConnection.burst is required" .Values.config.clientConnection.burst }}
 {{- end }}
-
+{{- if .Values.config.hostWritePath }}
+    defaultHostWritePath: {{ .Values.config.hostWritePath }}
+{{- end }}
+{{- if .Values.config.devicePattern }}
+    defaultDevicePattern: {{ .Values.config.devicePattern }}
+{{- end }}
