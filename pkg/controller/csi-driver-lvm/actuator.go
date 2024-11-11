@@ -26,11 +26,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	namespace string = "kube-system"
+
+	oldName        string = "csi-lvm"
+	oldNamespace   string = "csi-lvm"
+	oldProvisioner string = "metal-stack.io/csi-lvm"
 )
 
 // NewActuator returns an actuator responsible for Extension resources.
@@ -50,6 +55,14 @@ type actuator struct {
 
 // Reconcile the Extension resource.
 func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) error {
+	err := a.removeOldCsilvm(ctx)
+
+	if err != nil {
+		return fmt.Errorf("unable to remove old csi-lvm driver: %w", err)
+	}
+
+	log.Info("successfully removed old csi-lvm driver")
+
 	csidriverlvmConfig := &v1alpha1.CsiDriverLvmConfig{}
 	if ex.Spec.ProviderConfig != nil {
 		_, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, csidriverlvmConfig)
@@ -74,7 +87,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return err
 	}
 
-	pluginObjects, err := a.pluginObjects(namespace, csidriverlvmConfig, log)
+	pluginObjects, err := a.pluginObjects(namespace, csidriverlvmConfig)
 	if err != nil {
 		return err
 	}
@@ -88,13 +101,13 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return err
 	}
 
-	err = managedresources.CreateForSeed(ctx, a.client, namespace, v1alpha1.SeedCsiDriverLvmResourceName, false, seedResources)
+	err = managedresources.CreateForSeed(ctx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName, false, seedResources)
 
 	if err != nil {
 		return nil
 	}
 
-	log.Info("managed resource created succesfully", "name", v1alpha1.SeedCsiDriverLvmResourceName)
+	log.Info("managed resource created succesfully", "name", v1alpha1.ShootCsiDriverLvmResourceName)
 
 	return nil
 }
@@ -102,7 +115,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 // Delete the Extension resource.
 func (a *actuator) Delete(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) error {
 
-	err := managedresources.Delete(ctx, a.client, namespace, v1alpha1.SeedCsiDriverLvmResourceName, false)
+	err := managedresources.Delete(ctx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName, false)
 
 	if err != nil {
 		return err
@@ -111,7 +124,7 @@ func (a *actuator) Delete(ctx context.Context, log logr.Logger, ex *extensionsv1
 	timeoutCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	err = managedresources.WaitUntilDeleted(timeoutCtx, a.client, namespace, v1alpha1.SeedCsiDriverLvmResourceName)
+	err = managedresources.WaitUntilDeleted(timeoutCtx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName)
 	if err != nil {
 		return err
 	}
@@ -332,7 +345,7 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 	return objects, nil
 }
 
-func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig, log logr.Logger) ([]client.Object, error) {
+func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
 
 	csidriverlvmDriver := &storagev1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
@@ -556,7 +569,7 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 								"--nodeid=$(KUBE_NODE_NAME)",
 								"--vgname=csi-lvm",
 								"--namespace=kube-system",
-								"--provisionerImage=" + csiDriverLvmProvisionerImage.String(),
+								"--provisionerimage=" + csiDriverLvmProvisionerImage.String(),
 								"--pullpolicy=IfNotPresent",
 							},
 							SecurityContext: &corev1.SecurityContext{
@@ -734,4 +747,35 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 	}
 
 	return objects, nil
+}
+
+func (a *actuator) removeOldCsilvm(ctx context.Context) error {
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: oldNamespace,
+		},
+	}
+
+	err := a.client.Get(ctx, client.ObjectKeyFromObject(namespace), namespace)
+	if err == nil {
+		a.client.Delete(ctx, namespace)
+	} else if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("error while getting old csi-lvm namespace: %w", err)
+	}
+
+	storageClass := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: oldName,
+		},
+		Provisioner: oldProvisioner,
+	}
+
+	err = a.client.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass)
+	if err == nil {
+		a.client.Delete(ctx, storageClass)
+	} else if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
+	}
+	return nil
 }

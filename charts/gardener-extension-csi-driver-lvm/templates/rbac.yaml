@@ -41,20 +41,15 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - secrets
-  - configmaps
+  - namespaces
   verbs:
   - get
   - list
   - watch
-  - create
-  - update
-  - patch
-  - delete
 - apiGroups:
-  - ""
+  - "storage.k8s.io"
   resources:
-  - namespaces
+  - storageclasses
   verbs:
   - get
   - list

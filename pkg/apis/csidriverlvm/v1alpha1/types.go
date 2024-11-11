@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	SeedCsiDriverLvmResourceName = "extension-csi-driver-lvm"
+	ShootCsiDriverLvmResourceName = "extension-csi-driver-lvm"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
