@@ -758,8 +758,12 @@ func (a *actuator) removeOldCsilvm(ctx context.Context) error {
 	}
 
 	err := a.client.Get(ctx, client.ObjectKeyFromObject(namespace), namespace)
+
 	if err == nil {
-		a.client.Delete(ctx, namespace)
+		err = a.client.Delete(ctx, namespace)
+		if err != nil {
+			return fmt.Errorf("error while deleting old csi-lvm namespace: %w", err)
+		}
 	} else if !apierrors.IsNotFound(err) {
 		return fmt.Errorf("error while getting old csi-lvm namespace: %w", err)
 	}
@@ -773,7 +777,10 @@ func (a *actuator) removeOldCsilvm(ctx context.Context) error {
 
 	err = a.client.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass)
 	if err == nil {
-		a.client.Delete(ctx, storageClass)
+		err := a.client.Delete(ctx, storageClass)
+		if err != nil {
+			return fmt.Errorf("error while deleting old csi-lvm storageclass: %w", err)
+		}
 	} else if !apierrors.IsNotFound(err) {
 		return fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
 	}
