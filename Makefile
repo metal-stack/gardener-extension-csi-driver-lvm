@@ -1,5 +1,5 @@
 ENSURE_GARDENER_MOD         := $(shell go get github.com/gardener/gardener@$$(go list -m -f "{{.Version}}" github.com/gardener/gardener))
-GARDENER_HACK_DIR    		:= $(shell go list -m -f "{{.Dir}}" github.com/gardener/gardener)/hack
+GARDENER_HACK_DIR           := $(shell go list -m -f "{{.Dir}}" github.com/gardener/gardener)/hack
 IMAGE_TAG                   := $(or ${GITHUB_TAG_NAME}, latest)
 REGISTRY                    := ghcr.io/metal-stack
 IMAGE_PREFIX                := $(REGISTRY)
@@ -12,7 +12,7 @@ LEADER_ELECTION             := false
 IGNORE_OPERATION_ANNOTATION := false
 WEBHOOK_CONFIG_URL          := localhost
 
-GOLANGCI_LINT_VERSION := v1.61.0
+GOLANGCI_LINT_VERSION := v1.62.0
 GO_VERSION := 1.23
 
 ifeq ($(CI),true)

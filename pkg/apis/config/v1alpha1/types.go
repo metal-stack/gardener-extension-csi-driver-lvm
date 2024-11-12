@@ -11,7 +11,12 @@ import (
 type ControllerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// DefaultDevicePattern can be used to configure the glob pattern for the devices used by the LVM driver
+	// +optional
 	DefaultDevicePattern *string `json:"defaultDevicePattern,omitempty"`
+
+	// DefaultHostWritePath can be used to configure the default path for the host write path - used on read-only filesystems (Talos  OS "/var/etc/lvm")
+	// +optional
 	DefaultHostWritePath *string `json:"defaultHostWritePath,omitempty"`
 
 	// HealthCheckConfig is the config for the health check controller

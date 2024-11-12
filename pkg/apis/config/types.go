@@ -12,7 +12,10 @@ import (
 type ControllerConfiguration struct {
 	metav1.TypeMeta
 
+	// DefaultDevicePattern can be used to configure the glob pattern for the devices used by the LVM driver
 	DefaultDevicePattern *string
+
+	// DefaultHostWritePath can be used to configure the default path for the host write path - used on read-only filesystems (Talos  OS "/var/etc/lvm")
 	DefaultHostWritePath *string
 
 	// HealthCheckConfig is the config for the health check controller

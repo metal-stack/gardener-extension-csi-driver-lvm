@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -55,7 +56,7 @@ type actuator struct {
 
 // Reconcile the Extension resource.
 func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	err := a.removeOldCsilvm(ctx)
+	err := a.checkForOldCsiLvm(ctx)
 
 	if err != nil {
 		return fmt.Errorf("unable to remove old csi-lvm driver: %w", err)
@@ -245,7 +246,6 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 	}
 
 	var hostPathType corev1.HostPathType = corev1.HostPathDirectoryOrCreate
-	var replicas = int32(1)
 
 	csidriverlvmStatefulsetController := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -255,7 +255,7 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 			Labels:      map[string]string{},
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:    &replicas,
+			Replicas:    ptr.To(int32(1)),
 			ServiceName: "csi-driver-lvm-controller",
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -265,7 +265,7 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "csi-driver-lvm",
+						"app": "csi-driver-lvm-controller",
 					},
 					Annotations: map[string]string{},
 				},
@@ -504,8 +504,6 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 
 	var hostPathTypeCreate corev1.HostPathType = corev1.HostPathDirectoryOrCreate
 	var hostPathTypeDir corev1.HostPathType = corev1.HostPathDirectory
-	var revisionHistoryLimit = int32(10)
-	var healthPort = int32(9898)
 
 	csidriverlvmDaemonSetPlugin := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -513,7 +511,7 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 			Namespace: namespace,
 		},
 		Spec: appsv1.DaemonSetSpec{
-			RevisionHistoryLimit: &revisionHistoryLimit,
+			RevisionHistoryLimit: ptr.To(int32(10)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "csi-driver-lvm-plugin",
@@ -596,7 +594,7 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path:   "/healthz",
-										Port:   intstr.FromInt32(healthPort),
+										Port:   intstr.FromInt(9898),
 										Scheme: corev1.URISchemeHTTP,
 									},
 								},
@@ -749,8 +747,7 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 	return objects, nil
 }
 
-func (a *actuator) removeOldCsilvm(ctx context.Context) error {
-
+func (a *actuator) checkForOldCsiLvm(ctx context.Context) error {
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: oldNamespace,
@@ -760,10 +757,7 @@ func (a *actuator) removeOldCsilvm(ctx context.Context) error {
 	err := a.client.Get(ctx, client.ObjectKeyFromObject(namespace), namespace)
 
 	if err == nil {
-		err = a.client.Delete(ctx, namespace)
-		if err != nil {
-			return fmt.Errorf("error while deleting old csi-lvm namespace: %w", err)
-		}
+		return fmt.Errorf("old csi-lvm namespace still exists - please remove it via gardener-extension-provider-metal")
 	} else if !apierrors.IsNotFound(err) {
 		return fmt.Errorf("error while getting old csi-lvm namespace: %w", err)
 	}
@@ -777,10 +771,7 @@ func (a *actuator) removeOldCsilvm(ctx context.Context) error {
 
 	err = a.client.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass)
 	if err == nil {
-		err := a.client.Delete(ctx, storageClass)
-		if err != nil {
-			return fmt.Errorf("error while deleting old csi-lvm storageclass: %w", err)
-		}
+		return fmt.Errorf("old csi-lvm storage-class still exists - please remove it via gardener-extension-provider-metal")
 	} else if !apierrors.IsNotFound(err) {
 		return fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
 	}
