@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"regexp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -16,4 +18,10 @@ type CsiDriverLvmConfig struct {
 
 	DevicePattern *string `json:"devicePattern,omitempty"`
 	HostWritePath *string `json:"hostWritePath,omitempty"`
+}
+
+func (config *CsiDriverLvmConfig) IsVaild() bool {
+	re := regexp.MustCompile(`^(/[^/ ]*)+/?$`)
+
+	return re.MatchString(*config.HostWritePath) && re.MatchString(*config.DevicePattern)
 }

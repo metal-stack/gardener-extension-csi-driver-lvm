@@ -72,6 +72,10 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		}
 	}
 
+	if !csidriverlvmConfig.IsVaild() {
+		return fmt.Errorf("invalid csi-driver-lvm configuration")
+	}
+
 	var hostwritepath = csidriverlvmConfig.HostWritePath
 	var devicepattern = csidriverlvmConfig.DevicePattern
 
