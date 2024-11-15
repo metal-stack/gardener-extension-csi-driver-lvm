@@ -7,21 +7,23 @@ import (
 
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 
+	gutil "github.com/gardener/gardener/extensions/pkg/util"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
+
+	extensionsconfig "github.com/gardener/gardener/extensions/pkg/apis/config"
 	"github.com/go-logr/logr"
+	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/config"
+	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csidriverlvm/v1alpha1"
+	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/imagevector"
+	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/config"
-	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csidriverlvm/v1alpha1"
-	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/imagevector"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -56,14 +58,6 @@ type actuator struct {
 
 // Reconcile the Extension resource.
 func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	err := a.checkForOldCsiLvm(ctx)
-
-	if err != nil {
-		return fmt.Errorf("unable to remove old csi-lvm driver: %w", err)
-	}
-
-	log.Info("successfully removed old csi-lvm driver")
-
 	csidriverlvmConfig := &v1alpha1.CsiDriverLvmConfig{}
 	if ex.Spec.ProviderConfig != nil {
 		_, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, csidriverlvmConfig)
@@ -72,19 +66,18 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		}
 	}
 
-	if !csidriverlvmConfig.IsVaild() {
+	csidriverlvmConfig.ConfigureDefaults(a.config.DefaultHostWritePath, a.config.DefaultDevicePattern)
+	if !csidriverlvmConfig.IsValid() {
 		return fmt.Errorf("invalid csi-driver-lvm configuration")
 	}
 
-	var hostwritepath = csidriverlvmConfig.HostWritePath
-	var devicepattern = csidriverlvmConfig.DevicePattern
-
-	if hostwritepath == nil {
-		csidriverlvmConfig.HostWritePath = a.config.DefaultHostWritePath
+	isOldCsiLvmExisting, err := a.isOldCsiLvmExisting(ctx, ex.Namespace)
+	if err != nil {
+		return fmt.Errorf("failed to check if old csi-lvm is existing: %w", err)
 	}
-
-	if devicepattern == nil {
-		csidriverlvmConfig.DevicePattern = a.config.DefaultDevicePattern
+	if isOldCsiLvmExisting {
+		log.Info("old csi-lvm is existing, skipping reconcilation")
+		return nil
 	}
 
 	controllerObjects, err := a.controllerObjects(namespace)
@@ -751,19 +744,25 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 	return objects, nil
 }
 
-func (a *actuator) checkForOldCsiLvm(ctx context.Context) error {
+func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace string) (bool, error) {
+	_, shootClient, err := gutil.NewClientForShoot(ctx, a.client, shootNamespace, client.Options{}, extensionsconfig.RESTOptions{})
+
+	if err != nil {
+		return true, fmt.Errorf("failed to create shoot client: %w", err)
+	}
+
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: oldNamespace,
 		},
 	}
 
-	err := a.client.Get(ctx, client.ObjectKeyFromObject(namespace), namespace)
+	err = shootClient.Get(ctx, client.ObjectKeyFromObject(namespace), namespace)
 
 	if err == nil {
-		return fmt.Errorf("old csi-lvm namespace still exists - please remove it via gardener-extension-provider-metal")
+		return true, nil
 	} else if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("error while getting old csi-lvm namespace: %w", err)
+		return true, fmt.Errorf("error while getting old csi-lvm namespace: %w", err)
 	}
 
 	storageClass := &storagev1.StorageClass{
@@ -773,11 +772,11 @@ func (a *actuator) checkForOldCsiLvm(ctx context.Context) error {
 		Provisioner: oldProvisioner,
 	}
 
-	err = a.client.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass)
+	err = shootClient.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass)
 	if err == nil {
-		return fmt.Errorf("old csi-lvm storage-class still exists - please remove it via gardener-extension-provider-metal")
+		return true, nil
 	} else if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
+		return true, fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
 	}
-	return nil
+	return false, nil
 }

@@ -23,10 +23,18 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	// SchemeBuilder used to register the Shoot resource.
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	SchemeBuilder      runtime.SchemeBuilder
+	localSchemeBuilder = &SchemeBuilder
 	// AddToScheme is a pointer to SchemeBuilder.AddToScheme.
-	AddToScheme = SchemeBuilder.AddToScheme
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
+
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addKnownTypes)
+}
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {

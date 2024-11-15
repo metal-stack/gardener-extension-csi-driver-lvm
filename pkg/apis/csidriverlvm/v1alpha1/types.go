@@ -20,8 +20,22 @@ type CsiDriverLvmConfig struct {
 	HostWritePath *string `json:"hostWritePath,omitempty"`
 }
 
-func (config *CsiDriverLvmConfig) IsVaild() bool {
+func (config *CsiDriverLvmConfig) ConfigureDefaults(hostWritePath *string, devicePattern *string) {
+	if config.HostWritePath == nil {
+		config.HostWritePath = hostWritePath
+	}
+	if config.DevicePattern == nil {
+		config.DevicePattern = devicePattern
+	}
+}
+
+func (config *CsiDriverLvmConfig) IsValid() bool {
 	re := regexp.MustCompile(`^(/[^/ ]*)+/?$`)
+
+	if (config.HostWritePath == nil) || (config.DevicePattern == nil) {
+		println("HostWritePath or DevicePattern is nil", config.HostWritePath, config.DevicePattern)
+		return false
+	}
 
 	return re.MatchString(*config.HostWritePath) && re.MatchString(*config.DevicePattern)
 }

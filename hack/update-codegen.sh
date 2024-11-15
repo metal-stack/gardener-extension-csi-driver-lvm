@@ -32,8 +32,8 @@ bash "${CODE_GEN_DIR}/generate-internal-groups.sh" \
   github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/client \
   github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis \
   github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis \
-  "csi-driver-lvm:v1alpha1" \
-  --extra-peer-dirs=github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csi-driver-lvm,github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csi-driver-lvm/v1alpha1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/conversion,k8s.io/apimachinery/pkg/runtime \
+  "csidriverlvm:v1alpha1" \
+  --extra-peer-dirs=github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csidriverlvm,github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csidriverlvm/v1alpha1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/conversion,k8s.io/apimachinery/pkg/runtime \
   --go-header-file "${PROJECT_ROOT}/hack/boilerplate.txt"
 
 bash "${CODE_GEN_DIR}/generate-internal-groups.sh" \
