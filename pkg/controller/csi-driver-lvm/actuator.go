@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	namespace string = "kube-system"
+	namespace   string = "kube-system"
+	provisioner string = "lvm.csi.metal-stack.io"
 
 	oldName        string = "csi-lvm"
 	oldNamespace   string = "csi-lvm"
@@ -94,15 +95,15 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 	objects = append(objects, controllerObjects...)
 	objects = append(objects, pluginObjects...)
 
-	shootResources, err := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer).AddAllAndSerialize(objects...)
+	shootResources, err := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer).AddAllAndSerialize(objects...)
 	if err != nil {
 		return err
 	}
 
-	err = managedresources.CreateForShoot(ctx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName, "csi-driver-lvm-extension", false, shootResources)
+	err = managedresources.CreateForShoot(ctx, a.client, ex.Namespace, v1alpha1.ShootCsiDriverLvmResourceName, "csi-driver-lvm-extension", false, shootResources)
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	log.Info("managed resource created succesfully", "name", v1alpha1.ShootCsiDriverLvmResourceName)
@@ -242,6 +243,11 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 		return nil, fmt.Errorf("failed to find csi-resizer image: %w", err)
 	}
 
+	csiProvisionerImage, err := imagevector.ImageVector().FindImage("csi-provisioner")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find csi-provisioner image: %w", err)
+	}
+
 	var hostPathType corev1.HostPathType = corev1.HostPathDirectoryOrCreate
 
 	csidriverlvmStatefulsetController := &appsv1.StatefulSet{
@@ -292,6 +298,19 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 						{
 							Name:            "csi-attacher",
 							Image:           csiAttacherImage.String(),
+							ImagePullPolicy: "IfNotPresent",
+							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
+							SecurityContext: &corev1.SecurityContext{
+								ReadOnlyRootFilesystem: pointer.Pointer(true),
+								Privileged:             pointer.Pointer(true),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{MountPath: "/csi", Name: "socket-dir"},
+							},
+						},
+						{
+							Name:            "csi-provisioner",
+							Image:           csiProvisionerImage.String(),
 							ImagePullPolicy: "IfNotPresent",
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--feature-gates=Topology=true"},
 							SecurityContext: &corev1.SecurityContext{
@@ -769,12 +788,15 @@ func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace strin
 		ObjectMeta: metav1.ObjectMeta{
 			Name: oldName,
 		},
-		Provisioner: oldProvisioner,
 	}
 
-	err = shootClient.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass)
+	err = shootClient.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass, &client.GetOptions{})
 	if err == nil {
-		return true, nil
+		if storageClass.Provisioner == provisioner {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("old csi-lvm storageclass is existing ")
+		}
 	} else if !apierrors.IsNotFound(err) {
 		return true, fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
 	}
