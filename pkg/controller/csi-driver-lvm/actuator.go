@@ -101,12 +101,12 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 	objects = append(objects, controllerObjects...)
 	objects = append(objects, pluginObjects...)
 
-	seedResources, err := managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer).AddAllAndSerialize(objects...)
+	shootResources, err := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer).AddAllAndSerialize(objects...)
 	if err != nil {
 		return err
 	}
 
-	err = managedresources.CreateForSeed(ctx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName, false, seedResources)
+	err = managedresources.CreateForShoot(ctx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName, "csi-driver-lvm-extension", false, shootResources)
 
 	if err != nil {
 		return nil
