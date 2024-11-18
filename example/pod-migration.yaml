@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: volume-test
+  name: volume-test-migration
   namespace: default
 spec:
   containers:
@@ -18,6 +18,12 @@ spec:
       mountPath: /striped
     - name: default
       mountPath: /default
+    - name: linear-old
+      mountPath: /linear-old
+    - name: mirror-old
+      mountPath: /mirror-old
+    - name: striped-old
+      mountPath: /striped-old
     ports:
     - containerPort: 80
     resources:
@@ -27,13 +33,22 @@ spec:
   volumes:
   - name: linear
     persistentVolumeClaim:
-      claimName: csi-pvc-linear
+      claimName: csi-driver-lvm-pvc-linear
   - name: mirror
     persistentVolumeClaim:
-      claimName: csi-pvc-mirror
+      claimName: csi-driver-lvm-pvc-mirror
   - name: striped
     persistentVolumeClaim:
-      claimName: csi-pvc-striped
+      claimName: csi-driver-lvm-pvc-striped
   - name: default
     persistentVolumeClaim:
-      claimName: csi-pvc-default
+      claimName: csi-driver-lvm-pvc-default
+  - name: linear-old
+    persistentVolumeClaim:
+      claimName: lvm-pvc-linear
+  - name: mirror-old
+    persistentVolumeClaim:
+      claimName: lvm-pvc-mirror
+  - name: striped-old
+    persistentVolumeClaim:
+      claimName: lvm-pvc-striped

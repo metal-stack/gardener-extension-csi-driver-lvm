@@ -779,7 +779,7 @@ func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace strin
 	err = shootClient.Get(ctx, client.ObjectKeyFromObject(namespace), namespace)
 
 	if err == nil {
-		return true, fmt.Errorf("old csi-lvm namespace is existing")
+		return true, nil
 	} else if !apierrors.IsNotFound(err) {
 		return true, fmt.Errorf("error while getting old csi-lvm namespace: %w", err)
 	}
@@ -795,7 +795,7 @@ func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace strin
 		if storageClass.Provisioner == provisioner {
 			return false, nil
 		} else {
-			return true, fmt.Errorf("old csi-lvm storageclass is existing")
+			return true, nil
 		}
 	} else if !apierrors.IsNotFound(err) {
 		return true, fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
