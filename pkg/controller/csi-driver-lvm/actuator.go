@@ -188,7 +188,7 @@ func (a *actuator) controllerObjects(namespace string) ([]client.Object, error) 
 			},
 			{
 				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"storageclaess"},
+				Resources: []string{"storageclasses"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
@@ -779,7 +779,7 @@ func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace strin
 	err = shootClient.Get(ctx, client.ObjectKeyFromObject(namespace), namespace)
 
 	if err == nil {
-		return true, nil
+		return true, fmt.Errorf("old csi-lvm namespace is existing")
 	} else if !apierrors.IsNotFound(err) {
 		return true, fmt.Errorf("error while getting old csi-lvm namespace: %w", err)
 	}
@@ -793,9 +793,9 @@ func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace strin
 	err = shootClient.Get(ctx, client.ObjectKeyFromObject(storageClass), storageClass, &client.GetOptions{})
 	if err == nil {
 		if storageClass.Provisioner == provisioner {
-			return true, nil
+			return false, nil
 		} else {
-			return false, fmt.Errorf("old csi-lvm storageclass is existing ")
+			return true, fmt.Errorf("old csi-lvm storageclass is existing")
 		}
 	} else if !apierrors.IsNotFound(err) {
 		return true, fmt.Errorf("error while getting old csi-lvm storageclass: %w", err)
