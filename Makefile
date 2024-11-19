@@ -85,8 +85,8 @@ generate-in-docker: tidy $(HELM) $(YQ)
 	# echo $(shell git describe --abbrev=0 --tags) > VERSION
 	docker run --rm -i$(DOCKER_TTY_ARG) -v $(PWD):/go/src/github.com/metal-stack/gardener-extension-csi-driver-lvm golang:$(GO_VERSION) \
 		sh -c "cd /go/src/github.com/metal-stack/gardener-extension-csi-driver-lvm \
+				&& chown -R $(shell id -u):$(shell id -g) . \
 				&& make generate \
-				# && make install generate \
 				&& chown -R $(shell id -u):$(shell id -g) ."
 
 .PHONY: test
