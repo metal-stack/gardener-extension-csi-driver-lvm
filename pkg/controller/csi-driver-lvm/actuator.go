@@ -582,7 +582,7 @@ func (a *actuator) pluginObjects(namespace string, csidriverlvmConfig *v1alpha1.
 								"--drivername=lvm.csi.metal-stack.io",
 								"--endpoint=unix:///csi/csi.sock",
 								"--hostwritepath=" + pointer.SafeDeref(csidriverlvmConfig.HostWritePath),
-								"--devices=" + pointer.SafeDeref(csidriverlvmConfig.HostWritePath),
+								"--devices=" + pointer.SafeDeref(csidriverlvmConfig.DevicePattern),
 								"--nodeid=$(KUBE_NODE_NAME)",
 								"--vgname=csi-lvm",
 								"--namespace=kube-system",

@@ -18,12 +18,6 @@ spec:
       mountPath: /striped
     - name: default
       mountPath: /default
-    - name: linear-old
-      mountPath: /linear-old
-    - name: mirror-old
-      mountPath: /mirror-old
-    - name: striped-old
-      mountPath: /striped-old
     ports:
     - containerPort: 80
     resources:
@@ -43,12 +37,3 @@ spec:
   - name: default
     persistentVolumeClaim:
       claimName: csi-driver-lvm-pvc-default
-  - name: linear-old
-    persistentVolumeClaim:
-      claimName: lvm-pvc-linear
-  - name: mirror-old
-    persistentVolumeClaim:
-      claimName: lvm-pvc-mirror
-  - name: striped-old
-    persistentVolumeClaim:
-      claimName: lvm-pvc-striped
