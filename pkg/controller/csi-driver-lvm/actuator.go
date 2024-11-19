@@ -114,7 +114,8 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 // Delete the Extension resource.
 func (a *actuator) Delete(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) error {
 
-	err := managedresources.Delete(ctx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName, false)
+	log.Info("deleting managed resource")
+	err := managedresources.Delete(ctx, a.client, ex.Namespace, v1alpha1.ShootCsiDriverLvmResourceName, false)
 
 	if err != nil {
 		return err
@@ -123,10 +124,12 @@ func (a *actuator) Delete(ctx context.Context, log logr.Logger, ex *extensionsv1
 	timeoutCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	err = managedresources.WaitUntilDeleted(timeoutCtx, a.client, namespace, v1alpha1.ShootCsiDriverLvmResourceName)
+	err = managedresources.WaitUntilDeleted(timeoutCtx, a.client, ex.Namespace, v1alpha1.ShootCsiDriverLvmResourceName)
 	if err != nil {
 		return err
 	}
+
+	log.Info("successfully deleted managed resource")
 
 	return nil
 }
