@@ -78,14 +78,13 @@ check-generate:
 
 .PHONY: generate
 generate: $(VGOPATH) $(HELM) $(YQ)
+	# echo $(shell git -c safe.directory=/go/src/github.com/metal-stack/gardener-extension-csi-driver-lvm describe --abbrev=0 --tags) > VERSION
 	@REPO_ROOT=$(REPO_ROOT) VGOPATH=$(VGOPATH) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./pkg/...
 
 .PHONY: generate-in-docker
-generate-in-docker: tidy $(HELM) $(YQ)
-	# echo $(shell git describe --abbrev=0 --tags) > VERSION
+generate-in-docker: tidy install $(HELM) $(YQ)
 	docker run --rm -i$(DOCKER_TTY_ARG) -v $(PWD):/go/src/github.com/metal-stack/gardener-extension-csi-driver-lvm golang:$(GO_VERSION) \
 		sh -c "cd /go/src/github.com/metal-stack/gardener-extension-csi-driver-lvm \
-				&& chown -R $(shell id -u):$(shell id -g) . \
 				&& make generate \
 				&& chown -R $(shell id -u):$(shell id -g) ."
 
