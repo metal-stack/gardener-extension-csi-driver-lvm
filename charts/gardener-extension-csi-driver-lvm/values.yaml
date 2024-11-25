@@ -37,7 +37,7 @@ config:
     qps: 100
     burst: 130
 
-  devicePattern: /dev/loop10[0,1]
+  devicePattern: /dev/nvme[0-1]n[0-9]
   hostWritePath: /etc/lvm
 
 gardener:

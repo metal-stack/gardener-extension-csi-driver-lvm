@@ -32,7 +32,7 @@ The migration solution so far has been tested manually:
 5. install new controller & provisioner with helm
 6. add additional storage class with name `csi-lvm` and type linear
     1. mimics old storage class
-    2. default storage class
+    2. default storage class (not supported yet -> see default storage class of `gardener-extension-provider-metal`)
 7. create new pvcs
 8. create new pod with old and new pvcs and test
 

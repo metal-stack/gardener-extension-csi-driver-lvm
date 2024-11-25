@@ -115,22 +115,19 @@ func (options *Options) run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not instantiate controller-manager: %w", err)
 	}
-
 	log.Info("completed rest-options")
 
 	err = extensionscontroller.AddToScheme(mgr.GetScheme())
 	if err != nil {
 		return fmt.Errorf("could not add mgr-scheme to extension-controller: %w", err)
 	}
-
 	log.Info("added mgr-scheme to extensionscontroller")
 
 	err = install.AddToScheme(mgr.GetScheme())
 	if err != nil {
 		return fmt.Errorf("could not add mgr-scheme to installation")
 	}
-
-	log.Info("added mgr-schme to installation")
+	log.Info("added mgr-scheme to installation")
 
 	ctrlConfig := options.csidriverlvmOptions.Completed()
 	ctrlConfig.Apply(&controller.DefaultAddOptions.Config)
@@ -142,24 +139,21 @@ func (options *Options) run(ctx context.Context) error {
 	if err := options.controllerSwitches.Completed().AddToManager(ctx, mgr); err != nil {
 		return fmt.Errorf("could not add controllers to manager: %w", err)
 	}
+	log.Info("added controllers to manager")
 
 	if err := mgr.AddReadyzCheck("informer-sync", ghealth.NewCacheSyncHealthz(mgr.GetCache())); err != nil {
 		return fmt.Errorf("could not add ready check for informers: %w", err)
 	}
-
 	log.Info("added readyzcheck")
 
 	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
 		return fmt.Errorf("could not add health check to manager: %w", err)
 	}
-
 	log.Info("added healthzcheck")
 
 	if err := mgr.Start(ctx); err != nil {
 		return fmt.Errorf("error running manager: %w", err)
 	}
-
-	log.Info("started successfully")
 
 	return nil
 }
