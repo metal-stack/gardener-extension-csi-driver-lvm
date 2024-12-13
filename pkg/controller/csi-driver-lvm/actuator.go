@@ -41,7 +41,7 @@ const (
 	oldNamespace   string = "csi-lvm"
 	oldProvisioner string = "metal-stack.io/csi-lvm"
 
-	pullPolicy string = "IfNotPresent"
+	pullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
 )
 
 // NewActuator returns an actuator responsible for Extension resources.
@@ -301,7 +301,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 						{
 							Name:            "csi-attacher",
 							Image:           csiAttacherImage.String(),
-							ImagePullPolicy: "pullPolicy",
+							ImagePullPolicy: pullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
@@ -314,7 +314,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 						{
 							Name:            "csi-provisioner",
 							Image:           csiProvisionerImage.String(),
-							ImagePullPolicy: "pullPolicy",
+							ImagePullPolicy: pullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--feature-gates=Topology=true"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
@@ -327,7 +327,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 						{
 							Name:            "csi-resizer",
 							Image:           csiResizerImage.String(),
-							ImagePullPolicy: "pullPolicy",
+							ImagePullPolicy: pullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
@@ -547,7 +547,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 						{
 							Name:            "csi-node-driver-registrar",
 							Image:           csiNodeDriverRegistrarImage.String(),
-							ImagePullPolicy: "pullPolicy",
+							ImagePullPolicy: pullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--kubelet-registration-path=/var/lib/kubelet/plugins/csi-driver-lvm/csi.sock"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(false),
@@ -575,7 +575,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 						{
 							Name:            "csi-driver-lvm-plugin",
 							Image:           csiDriverLvmImage.String(),
-							ImagePullPolicy: "pullPolicy",
+							ImagePullPolicy: pullPolicy,
 							Args: []string{
 								"--drivername=lvm.csi.metal-stack.io",
 								"--endpoint=unix:///csi/csi.sock",
@@ -638,7 +638,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 						{
 							Name:            "livenessprobe",
 							Image:           livenessprobeImage.String(),
-							ImagePullPolicy: "pullPolicy",
+							ImagePullPolicy: pullPolicy,
 							Args: []string{
 								"--csi-address=/csi/csi.sock",
 								"--health-port=9898",
