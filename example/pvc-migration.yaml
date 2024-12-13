@@ -1,0 +1,48 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-driver-lvm-pvc-linear
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
+  storageClassName: csi-driver-lvm-linear
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-driver-lvm-pvc-striped
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
+  storageClassName: csi-driver-lvm-striped
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-driver-lvm-pvc-mirror
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
+  storageClassName: csi-driver-lvm-mirror
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-driver-lvm-pvc-default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
+  storageClassName: csi-lvm
