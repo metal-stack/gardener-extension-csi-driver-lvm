@@ -79,7 +79,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return fmt.Errorf("failed to check if old csi-lvm is existing: %w", err)
 	}
 	if isOldCsiLvmExisting {
-		log.Info("old csi-lvm is existing, skipping reconcilation")
+		log.Info("old csi-lvm is existing, skipping reconciliation")
 		return nil
 	}
 

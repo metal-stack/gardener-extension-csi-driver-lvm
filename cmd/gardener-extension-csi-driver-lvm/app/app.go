@@ -14,7 +14,7 @@ func NewControllerManagerCommand(ctx context.Context) *cobra.Command {
 	options := NewOptions()
 	cmd := &cobra.Command{
 		Use:           "gardener-extension-csi-driver-lvm",
-		Short:         "provides csi-driver-lvm for shoot cluster",
+		Short:         "provides csi-driver-lvm for shoot clusters",
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := options.optionAggregator.Complete()
