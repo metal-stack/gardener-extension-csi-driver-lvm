@@ -7,7 +7,7 @@ If not the extension will reconcile the new `csi-driver-lvm`.
 
 ## Development
 
-This extension can be developed in the gardener-local devel environment. Before make sure you have created loop-devices on your machine.
+This extension can be developed in the gardener-local devel environment. Before make sure you have created loop-devices on your machine (identical to how you would develop the csi-driver-lvm locally, refer to the repository [docs](https://github.com/metal-stack/csi-driver-lvm?tab=readme-ov-file#development) for further information).
 
 ```sh
 for i in 100 101; do fallocate -l 1G loop${i}.img ; sudo losetup /dev/loop${i} loop${i}.img; done
