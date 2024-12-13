@@ -5,13 +5,10 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/ptr"
 )
 
 var log = logr.New(logr.Discard().GetSink())
-
-func stringPtr(s string) *string {
-	return &s
-}
 
 func TestConfig(t *testing.T) {
 
@@ -32,14 +29,14 @@ func TestConfig(t *testing.T) {
 			desc: "test devicePattern nil config",
 			customData: &CsiDriverLvmConfig{
 				DevicePattern: nil,
-				HostWritePath: stringPtr("/etc/lvm"),
+				HostWritePath: ptr.To("/etc/lvm"),
 			},
 			valid: false,
 		},
 		{
 			desc: "test hostWritePath nil config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr("/dev/loop100"),
+				DevicePattern: ptr.To("/dev/loop100"),
 				HostWritePath: nil,
 			},
 			valid: false,
@@ -47,56 +44,56 @@ func TestConfig(t *testing.T) {
 		{
 			desc: "test empty config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr(""),
-				HostWritePath: stringPtr(""),
+				DevicePattern: ptr.To(""),
+				HostWritePath: ptr.To(""),
 			},
 			valid: false,
 		},
 		{
 			desc: "test empty devicePattern config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr(""),
-				HostWritePath: stringPtr("/etc/lvm"),
+				DevicePattern: ptr.To(""),
+				HostWritePath: ptr.To("/etc/lvm"),
 			},
 			valid: false,
 		},
 		{
 			desc: "test empty hostWritePath config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr("/dev/loop1"),
-				HostWritePath: stringPtr(""),
+				DevicePattern: ptr.To("/dev/loop1"),
+				HostWritePath: ptr.To(""),
 			},
 			valid: false,
 		},
 		{
 			desc: "test invalid devicePattern config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr("[a-"),
-				HostWritePath: stringPtr("/etc/lvm"),
+				DevicePattern: ptr.To("[a-"),
+				HostWritePath: ptr.To("/etc/lvm"),
 			},
 			valid: false,
 		},
 		{
 			desc: "test not absolute hostWritePath config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr("[a-z]"),
-				HostWritePath: stringPtr("./etc/lvm"),
+				DevicePattern: ptr.To("[a-z]"),
+				HostWritePath: ptr.To("./etc/lvm"),
 			},
 			valid: false,
 		},
 		{
 			desc: "test not absolute hostWritePath config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr("[a-z]"),
-				HostWritePath: stringPtr("etc/lvm"),
+				DevicePattern: ptr.To("[a-z]"),
+				HostWritePath: ptr.To("etc/lvm"),
 			},
 			valid: false,
 		},
 		{
 			desc: "test valid config",
 			customData: &CsiDriverLvmConfig{
-				DevicePattern: stringPtr("/dev/loop10[0,1]"),
-				HostWritePath: stringPtr("/etc/lvm"),
+				DevicePattern: ptr.To("/dev/loop10[0,1]"),
+				HostWritePath: ptr.To("/etc/lvm"),
 			},
 			valid: true,
 		},
