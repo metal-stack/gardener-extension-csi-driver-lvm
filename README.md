@@ -16,47 +16,8 @@ sudo losetup -a
 # for i in 100 101; do sudo losetup -d /dev/loop${i}; rm -f loop${i}.img; done
 ```
 
-Next you need to add these devices to the gardener kind cluster config (`example/gardener-local/kind/cluster/templates/cluster.yaml`).
-```yaml
-    - hostPath: /dev/loop100
-      containerPath: /dev/loop100
-    - hostPath: /dev/loop101
-      containerPath: /dev/loop101
-```
-
-In the end you also have to mount these volumes on machine creation (`pkg/provider-local/machine-provider/local/create_machine.go`):
-
-```go
-// applyPod()
-// Volume-Mounts
-    {
-        Name:      "loop100",
-        MountPath: "/dev/loop100",
-    },
-    {
-        Name:      "loop101",
-        MountPath: "/dev/loop101",
-    },
-// Volumes
-    {
-        Name: "loop100",
-        VolumeSource: corev1.VolumeSource{
-            HostPath: &corev1.HostPathVolumeSource{
-                Path: "/dev/loop100",
-            },
-        },
-    },
-    {
-        Name: "loop101",
-        VolumeSource: corev1.VolumeSource{
-            HostPath: &corev1.HostPathVolumeSource{
-                Path: "/dev/loop101",
-            },
-        },
-    },
-```
-
 1. Start up the local devel environment
 1. The extension's docker image can be pushed into Kind using `make push-to-gardener-local`
 1. Install the extension `kubectl apply -k example/`
 1. Parametrize the `example/shoot.yaml` and apply with `kubectl -f example/shoot.yaml`
+
