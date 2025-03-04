@@ -79,8 +79,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return fmt.Errorf("failed to check if old csi-lvm is existing: %w", err)
 	}
 	if isOldCsiLvmExisting {
-		log.Info("old csi-lvm is existing, skipping reconciliation")
-		return nil
+		return fmt.Errorf("assuming csi-lvm is still present due to existing storage class; csi-driver-lvm cannot run while csi-lvm is still deployed")
 	}
 
 	controllerObjects, err := a.controllerObjects()
@@ -108,7 +107,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return err
 	}
 
-	log.Info("managed resource created succesfully", "name", v1alpha1.ShootCsiDriverLvmResourceName)
+	log.Info("managed resource created successfully", "name", v1alpha1.ShootCsiDriverLvmResourceName)
 
 	return nil
 }
