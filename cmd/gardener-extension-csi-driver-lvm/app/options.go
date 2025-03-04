@@ -133,7 +133,7 @@ func (options *Options) run(ctx context.Context) error {
 	ctrlConfig.Apply(&controller.DefaultAddOptions.Config)
 
 	options.controllerOptions.Completed().Apply(&controller.DefaultAddOptions.ControllerOptions)
-	options.reconcileOptions.Completed().Apply(&controller.DefaultAddOptions.IgnoreOperationAnnotation)
+	options.reconcileOptions.Completed().Apply(&controller.DefaultAddOptions.IgnoreOperationAnnotation, &controller.DefaultAddOptions.ExtensionClass)
 	options.heartbeatOptions.Completed().Apply(&heartbeatcontroller.DefaultAddOptions)
 
 	if err := options.controllerSwitches.Completed().AddToManager(ctx, mgr); err != nil {
