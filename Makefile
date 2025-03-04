@@ -12,8 +12,8 @@ LEADER_ELECTION             := false
 IGNORE_OPERATION_ANNOTATION := false
 WEBHOOK_CONFIG_URL          := localhost
 
-GOLANGCI_LINT_VERSION := v1.62.0
-GO_VERSION := 1.23
+GOLANGCI_LINT_VERSION := v1.64.6
+GO_VERSION := 1.24
 
 ifeq ($(CI),true)
   DOCKER_TTY_ARG=""
@@ -78,7 +78,7 @@ check-generate:
 
 .PHONY: generate
 generate: $(VGOPATH) $(HELM) $(YQ)
-	# echo $(shell git -c safe.directory=/go/src/github.com/metal-stack/gardener-extension-csi-driver-lvm describe --abbrev=0 --tags) > VERSION
+	echo $(shell git -c safe.directory=/go/src/github.com/metal-stack/gardener-extension-csi-driver-lvm describe --abbrev=0 --tags) > VERSION
 	@REPO_ROOT=$(REPO_ROOT) VGOPATH=$(VGOPATH) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./pkg/...
 
 .PHONY: generate-in-docker
