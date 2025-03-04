@@ -40,6 +40,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_CsiDriverLvmConfig_To_csidriverlvm_CsiDriverLvmConfig(in *CsiDriverLvmConfig, out *csidriverlvm.CsiDriverLvmConfig, s conversion.Scope) error {
 	out.DevicePattern = (*string)(unsafe.Pointer(in.DevicePattern))
 	out.HostWritePath = (*string)(unsafe.Pointer(in.HostWritePath))
+	out.DefaultStorageClass = (*string)(unsafe.Pointer(in.DefaultStorageClass))
 	return nil
 }
 
@@ -51,6 +52,7 @@ func Convert_v1alpha1_CsiDriverLvmConfig_To_csidriverlvm_CsiDriverLvmConfig(in *
 func autoConvert_csidriverlvm_CsiDriverLvmConfig_To_v1alpha1_CsiDriverLvmConfig(in *csidriverlvm.CsiDriverLvmConfig, out *CsiDriverLvmConfig, s conversion.Scope) error {
 	out.DevicePattern = (*string)(unsafe.Pointer(in.DevicePattern))
 	out.HostWritePath = (*string)(unsafe.Pointer(in.HostWritePath))
+	out.DefaultStorageClass = (*string)(unsafe.Pointer(in.DefaultStorageClass))
 	return nil
 }
 

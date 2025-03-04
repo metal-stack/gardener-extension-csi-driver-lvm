@@ -15,4 +15,7 @@ type CsiDriverLvmConfig struct {
 
 	// HostWritePath can be used to configure the host write path - used on read-only filesystems (Talos  OS "/var/etc/lvm")
 	HostWritePath *string
+
+	// DefaultStorageClass can be set to a name of a storage class deployed by this extension, which will then be marked as the default storage class.
+	DefaultStorageClass *string
 }
