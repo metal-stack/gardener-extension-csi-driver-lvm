@@ -365,7 +365,6 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 }
 
 func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
-
 	csidriverlvmDriver := &storagev1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "csi-driver-lvm",
@@ -621,7 +620,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 								Protocol:      corev1.ProtocolTCP,
 								ContainerPort: 9898,
 							}},
-							TerminationMessagePath:   "/dev/termination-log",
+							TerminationMessagePath:   "/tmp/termination-log", // not mounting to /dev since it is mounted as hostpath
 							TerminationMessagePolicy: terminationPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
