@@ -95,6 +95,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 	objects := []client.Object{}
 	objects = append(objects, controllerObjects...)
 	objects = append(objects, pluginObjects...)
+	objects = append(objects, a.storageClasses(csidriverlvmConfig)...)
 
 	shootResources, err := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer).AddAllAndSerialize(objects...)
 	if err != nil {
@@ -441,61 +442,6 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 		},
 	}
 
-	var reclaimPolicy corev1.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimDelete
-	var volumeBindingMode storagev1.VolumeBindingMode = storagev1.VolumeBindingWaitForFirstConsumer
-
-	csidriverlvmLinearStorageClass := &storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "csi-driver-lvm-linear",
-		},
-		Provisioner:          "lvm.csi.metal-stack.io",
-		ReclaimPolicy:        &reclaimPolicy,
-		VolumeBindingMode:    &volumeBindingMode,
-		AllowVolumeExpansion: pointer.Pointer(true),
-		Parameters: map[string]string{
-			"type": "linear",
-		},
-	}
-
-	csidriverlvmMirrorStorageClass := &storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "csi-driver-lvm-mirror",
-		},
-		Provisioner:          "lvm.csi.metal-stack.io",
-		ReclaimPolicy:        &reclaimPolicy,
-		VolumeBindingMode:    &volumeBindingMode,
-		AllowVolumeExpansion: pointer.Pointer(true),
-		Parameters: map[string]string{
-			"type": "mirror",
-		},
-	}
-
-	csidriverlvmStripedStorageClass := &storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "csi-driver-lvm-striped",
-		},
-		Provisioner:          "lvm.csi.metal-stack.io",
-		ReclaimPolicy:        &reclaimPolicy,
-		VolumeBindingMode:    &volumeBindingMode,
-		AllowVolumeExpansion: pointer.Pointer(true),
-		Parameters: map[string]string{
-			"type": "striped",
-		},
-	}
-
-	csidriverlvmDefaultStorageClass := &storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "csi-lvm",
-		},
-		Provisioner:          "lvm.csi.metal-stack.io",
-		ReclaimPolicy:        &reclaimPolicy,
-		VolumeBindingMode:    &volumeBindingMode,
-		AllowVolumeExpansion: pointer.Pointer(true),
-		Parameters: map[string]string{
-			"type": "linear",
-		},
-	}
-
 	csiNodeDriverRegistrarImage, err := imagevector.ImageVector().FindImage("csi-node-driver-registrar")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find csi-node-driver-registrar image: %w", err)
@@ -752,14 +698,89 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 		csidriverlvmServiceAccountPlugin,
 		csidriverlvmClusterRolePlugin,
 		csidriverlvmClusterRoleBindingPlugin,
-		csidriverlvmDefaultStorageClass,
-		csidriverlvmLinearStorageClass,
-		csidriverlvmMirrorStorageClass,
-		csidriverlvmStripedStorageClass,
 		csidriverlvmDaemonSetPlugin,
 	}
 
 	return objects, nil
+}
+
+func (a *actuator) storageClasses(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) []client.Object {
+	var (
+		csidriverlvmLinearStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi-driver-lvm-linear",
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "linear",
+			},
+		}
+
+		csidriverlvmMirrorStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi-driver-lvm-mirror",
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "mirror",
+			},
+		}
+
+		csidriverlvmStripedStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi-driver-lvm-striped",
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "striped",
+			},
+		}
+
+		csidriverlvmDefaultStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi-lvm",
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "linear",
+			},
+		}
+
+		storageClasses = []*storagev1.StorageClass{
+			csidriverlvmDefaultStorageClass,
+			csidriverlvmLinearStorageClass,
+			csidriverlvmMirrorStorageClass,
+			csidriverlvmStripedStorageClass,
+		}
+
+		objects []client.Object
+	)
+
+	for _, sc := range storageClasses {
+		if csidriverlvmConfig.DefaultStorageClass != nil && *csidriverlvmConfig.DefaultStorageClass == sc.Name {
+			if sc.Annotations == nil {
+				sc.Annotations = map[string]string{}
+			}
+
+			sc.Annotations["storageclass.kubernetes.io/is-default-class"] = "true"
+		}
+
+		objects = append(objects, sc)
+	}
+
+	return objects
 }
 
 func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace string) (bool, error) {
