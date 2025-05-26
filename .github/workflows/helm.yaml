@@ -33,7 +33,7 @@ jobs:
           id: meta
           uses: docker/metadata-action@v5
 
-        # the replacement can be checked with:
+        # the replacement can be checked with
         # helm show values oci://ghcr.io/metal-stack/charts/<chart>:<tag>
         - name: Patch container image tags in values.yaml
           uses: mikefarah/yq@v4
