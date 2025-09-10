@@ -1,12 +1,16 @@
 # Migration from csi-lvm to csi-driver-lvm
 
-## Objective
+The migration from the deprecated [`csi-lvm`](https://github.com/metal-stack/csi-lvm) to the new `csi-driver-lvm` must be performed in multiple steps. In here we assume you are currently using the [gardener-extension-provider-metal](https://github.com/metal-stack/gardener-extension-provider-metal).
 
-The goal of this document is to provide instructions for migrating from the old [csi-lvm](https://github.com/metal-stack/csi-lvm/tree/master) to the new [csi-driver-lvm](https://github.com/metal-stack/csi-driver-lvm).
+1. Install `gardener-extension-csi-driver-lvm`. As long as the `csi-lvm` is still present in the shoot, this will not yet install the `csi-driver-lvm`.
+2. Disable `csi-lvm` in `gardener-extension-provider-metal` by setting `featureGates.disableCsiLvm` to `true`. This allows the `csi-driver-lvm` to be installed.
+3. Wait until the shoot has been successfully reconciled.
+4. Make sure the `csi-driver-lvm` has been installed and that the `csi-lvm` storage class has been created.
+5. Make sure to roll all nodes. Otherwise volumes will stop working after the next restart of a machine.
 
 ## Issues
 
-### Drop-in replacement not possible
+### Why is the Drop-in replacement not possible?
 
 Deploying the new csi-driver-lvm with the same provisioner-name as the old one is not possible, as it causes errors when using k8s sidecar images for controllers.
 
@@ -20,9 +24,7 @@ E1015 08:09:23.292482 1 node_register.go:56] failed to listen on socket: /regist
 
 This problem requires a more complex migration.
 
-## Solution
-
-### Local motivation
+## Manual migration
 The migration solution so far has been tested manually:
 
 1. create old controller & provisioner
@@ -35,10 +37,3 @@ The migration solution so far has been tested manually:
     2. default storage class (not supported yet -> see default storage class of `gardener-extension-provider-metal`)
 7. create new pvcs
 8. create new pod with old and new pvcs and test
-
-### Migration
-
-To achieve this behaviour for csi-lvm, provided by [gardener-extension-provider-metal](https://github.com/metal-stack/gardener-extension-provider-metal/tree/master), we need to add the following workflow:
-
-1. Add a feature gate to `gardener-extension-provider-metal` to disable csi-lvm.
-2. When deploying `gardener-extension-csi-driver-lvm`, stop reconciliation if old provisioner is still available.
