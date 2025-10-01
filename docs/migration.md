@@ -2,7 +2,7 @@
 
 The migration from the deprecated [`csi-lvm`](https://github.com/metal-stack/csi-lvm) to the new `csi-driver-lvm` must be performed in multiple steps. In here we assume you are currently using the [gardener-extension-provider-metal](https://github.com/metal-stack/gardener-extension-provider-metal).
 
-1. Install `gardener-extension-csi-driver-lvm`. As long as the `csi-lvm` is still present in the shoot, this will not yet install the `csi-driver-lvm`.
+1. Add  the the `csi-driver-lvm` extension to the shoot spec.
 2. Disable `csi-lvm` in `gardener-extension-provider-metal` by setting `featureGates.disableCsiLvm` to `true`. This allows the `csi-driver-lvm` to be installed.
 3. Wait until the shoot has been successfully reconciled.
 4. Make sure the `csi-driver-lvm` has been installed and that the `csi-lvm` storage class has been created.
