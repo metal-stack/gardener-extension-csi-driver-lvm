@@ -747,7 +747,7 @@ func (a *actuator) storageClasses(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfi
 
 		csidriverlvmDefaultStorageClass = &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "csi-lvm",
+				Name: oldName,
 			},
 			Provisioner:          "lvm.csi.metal-stack.io",
 			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
