@@ -2,11 +2,15 @@ images:
 - name: csi-driver-lvm
   sourceRepository: https://github.com/metal-stack/csi-driver-lvm
   repository:  ghcr.io/metal-stack/csi-driver-lvm
-  tag: "v0.6.0"
+  tag: "v0.6.1"
 - name: csi-driver-lvm-provisioner
   sourceRepository: https://github.com/metal-stack/csi-driver-lvm
   repository:  ghcr.io/metal-stack/csi-driver-lvm-provisioner
-  tag: "v0.6.0"
+  tag: "v0.6.1"
+- name: csi-driver-lvm-controller
+  sourceRepository: https://github.com/metal-stack/csi-driver-lvm
+  repository:  ghcr.io/metal-stack/csi-driver-lvm-controller
+  tag: "pod-eviction-controller"
 - name: csi-attacher
   sourceRepository: https://github.com/kubernetes-csi/external-attacher
   repository:  registry.k8s.io/sig-storage/csi-attacher

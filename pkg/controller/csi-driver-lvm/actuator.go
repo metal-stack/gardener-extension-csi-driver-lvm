@@ -30,6 +30,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -184,7 +185,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 			{
 				APIGroups: []string{""},
 				Resources: []string{"persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch", "delete"},
 			},
 			{
 				APIGroups: []string{""},
@@ -216,6 +217,21 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 				Resources: []string{"pods"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
+			{
+				APIGroups: []string{"apps"},
+				Resources: []string{"statefulsets"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
 		},
 	}
 
@@ -246,6 +262,11 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 	csiResizerImage, err := imagevector.ImageVector().FindImage("csi-resizer")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find csi-resizer image: %w", err)
+	}
+
+	csiDriverLvmControllerImage, err := imagevector.ImageVector().FindImage("csi-driver-lvm-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find eviction-controller image: %w", err)
 	}
 
 	csiProvisionerImage, err := imagevector.ImageVector().FindImage("csi-provisioner")
@@ -335,6 +356,48 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
+							},
+						},
+						{
+							Name:            "csi-driver-lvm-controller",
+							Image:           csiDriverLvmControllerImage.String(),
+							ImagePullPolicy: pullPolicy,
+							Args:            []string{"--leader-elect", "--health-probe-bind-address=:8081"},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.Pointer(false),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/healthz",
+										Port: intstr.FromInt(8081),
+									},
+								},
+								InitialDelaySeconds: 15,
+								PeriodSeconds:       20,
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/healthz",
+										Port: intstr.FromInt(8081),
+									},
+								},
+								InitialDelaySeconds: 5,
+								PeriodSeconds:       10,
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("500m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("10m"),
+									corev1.ResourceMemory: resource.MustParse("64Mi"),
+								},
 							},
 						},
 					},
