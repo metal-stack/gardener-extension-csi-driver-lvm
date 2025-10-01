@@ -7,3 +7,4 @@ helm
 hack/tools/bin/*
 bin
 .ci/
+loop*
