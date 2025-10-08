@@ -5,6 +5,15 @@ Provides a Gardener extension for managing [csi-driver-lvm](https://github.com/m
 As a safety measurement, the extension checks for the old [csi-lvm](https://github.com/metal-stack/csi-lvm/tree/master) and stops reconciling if the old driver is still available.
 If not the extension will reconcile the new `csi-driver-lvm`.
 
+The following storage classes will be created by default:
+
+- `csi-driver-lvm-linear` for linear volumes
+- `csi-driver-lvm-mirror` for mirrored volumes for improved redundancy on multiple physical volumes
+- `csi-driver-lvm-striped` for striped volumes for improved performance on multiple physical volumes
+- `csi-lvm` for backwards compatibility with type linear.
+
+See [docs/migration.md](./docs/migration.md) for further information about migrating from `csi-lvm` to `csi-driver-lvm`.
+
 ## Development
 
 This extension can be developed in the gardener-local devel environment. Before make sure you have created loop-devices on your machine (identical to how you would develop the csi-driver-lvm locally, refer to the repository [docs](https://github.com/metal-stack/csi-driver-lvm?tab=readme-ov-file#development) for further information).
