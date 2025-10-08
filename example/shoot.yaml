@@ -20,6 +20,8 @@ spec:
       # Your configuration here
       # devicePattern: /dev/nvme[0-9]n[0-9]
       # hostWritePath: /etc/lib
+      # defaultStorageClass: csi-driver-lvm-linear
+      # pullPolicy: IfNotPresent
   networking:
     type: calico
     nodes: 10.10.0.0/16

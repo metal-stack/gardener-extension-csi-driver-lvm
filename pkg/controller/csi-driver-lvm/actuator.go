@@ -36,9 +36,7 @@ import (
 
 const (
 	shootNamespace string = "kube-system"
-	provisioner    string = "lvm.csi.metal-stack.io"
 
-	oldName        string = "csi-lvm"
 	oldNamespace   string = "csi-lvm"
 	oldProvisioner string = "metal-stack.io/csi-lvm"
 
@@ -83,7 +81,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return fmt.Errorf("assuming csi-lvm is still present due to existing storage class; csi-driver-lvm cannot run while csi-lvm is still deployed")
 	}
 
-	controllerObjects, err := a.controllerObjects()
+	controllerObjects, err := a.controllerObjects(csidriverlvmConfig)
 	if err != nil {
 		return err
 	}
@@ -152,7 +150,7 @@ func (a *actuator) Migrate(ctx context.Context, log logr.Logger, ex *extensionsv
 	return nil
 }
 
-func (a *actuator) controllerObjects() ([]client.Object, error) {
+func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
 
 	csidriverlvmServiceAccountController := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -361,7 +359,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 						{
 							Name:            "csi-driver-lvm-controller",
 							Image:           csiDriverLvmControllerImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args:            []string{"--leader-elect", "--health-probe-bind-address=:8081"},
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: pointer.Pointer(false),
@@ -582,7 +580,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 						{
 							Name:            "csi-driver-lvm-plugin",
 							Image:           csiDriverLvmImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args: []string{
 								"--drivername=lvm.csi.metal-stack.io",
 								"--endpoint=unix:///csi/csi.sock",
@@ -592,7 +590,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 								"--vgname=csi-lvm",
 								"--namespace=kube-system",
 								"--provisionerimage=" + csiDriverLvmProvisionerImage.String(),
-								"--pullpolicy=pullPolicy",
+								"--pullpolicy=" + string(*csidriverlvmConfig.PullPolicy),
 							},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(false),

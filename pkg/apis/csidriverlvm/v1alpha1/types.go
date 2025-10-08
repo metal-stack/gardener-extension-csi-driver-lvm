@@ -4,7 +4,9 @@ import (
 	"path/filepath"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -28,6 +30,10 @@ type CsiDriverLvmConfig struct {
 	// DefaultStorageClass can be set to a name of a storage class deployed by this extension, which will then be marked as the default storage class.
 	// +optional
 	DefaultStorageClass *string `json:"defaultStorageClass,omitempty"`
+
+	// PullPolicy can be set to adjust the pull policy of the deployed components (development purpose). Defaults to "IfNotPresent".
+	// +optional
+	PullPolicy *corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
 func (config *CsiDriverLvmConfig) ConfigureDefaults(hostWritePath *string, devicePattern *string) {
@@ -36,6 +42,9 @@ func (config *CsiDriverLvmConfig) ConfigureDefaults(hostWritePath *string, devic
 	}
 	if config.DevicePattern == nil {
 		config.DevicePattern = devicePattern
+	}
+	if config.PullPolicy == nil {
+		config.PullPolicy = ptr.To(corev1.PullIfNotPresent)
 	}
 }
 
