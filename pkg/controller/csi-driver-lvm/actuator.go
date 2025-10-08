@@ -272,7 +272,7 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 		return nil, fmt.Errorf("failed to find csi-provisioner image: %w", err)
 	}
 
-	var hostPathType corev1.HostPathType = corev1.HostPathDirectoryOrCreate
+	var hostPathType = corev1.HostPathDirectoryOrCreate
 
 	csidriverlvmStatefulsetController := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -523,11 +523,11 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 		return nil, fmt.Errorf("failed to find csi-driver-lvm-provisioner image: %w", err)
 	}
 
-	var terminationPolicy corev1.TerminationMessagePolicy = corev1.TerminationMessageReadFile
-	var mountPropagation corev1.MountPropagationMode = corev1.MountPropagationBidirectional
+	var terminationPolicy = corev1.TerminationMessageReadFile
+	var mountPropagation = corev1.MountPropagationBidirectional
 
-	var hostPathTypeCreate corev1.HostPathType = corev1.HostPathDirectoryOrCreate
-	var hostPathTypeDir corev1.HostPathType = corev1.HostPathDirectory
+	var hostPathTypeCreate = corev1.HostPathDirectoryOrCreate
+	var hostPathTypeDir = corev1.HostPathDirectory
 
 	csidriverlvmDaemonSetPlugin := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
