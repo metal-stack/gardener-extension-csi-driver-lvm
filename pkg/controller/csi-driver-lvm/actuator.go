@@ -40,8 +40,6 @@ const (
 	oldName        string = "csi-lvm"
 	oldNamespace   string = "csi-lvm"
 	oldProvisioner string = "metal-stack.io/csi-lvm"
-
-	pullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
 )
 
 // NewActuator returns an actuator responsible for Extension resources.
