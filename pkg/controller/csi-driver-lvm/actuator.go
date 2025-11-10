@@ -30,18 +30,16 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	shootNamespace string = "kube-system"
-	provisioner    string = "lvm.csi.metal-stack.io"
 
 	oldName        string = "csi-lvm"
 	oldNamespace   string = "csi-lvm"
 	oldProvisioner string = "metal-stack.io/csi-lvm"
-
-	pullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
 )
 
 // NewActuator returns an actuator responsible for Extension resources.
@@ -82,7 +80,7 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return fmt.Errorf("assuming csi-lvm is still present due to existing storage class; csi-driver-lvm cannot run while csi-lvm is still deployed")
 	}
 
-	controllerObjects, err := a.controllerObjects()
+	controllerObjects, err := a.controllerObjects(csidriverlvmConfig)
 	if err != nil {
 		return err
 	}
@@ -151,7 +149,7 @@ func (a *actuator) Migrate(ctx context.Context, log logr.Logger, ex *extensionsv
 	return nil
 }
 
-func (a *actuator) controllerObjects() ([]client.Object, error) {
+func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
 
 	csidriverlvmServiceAccountController := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -184,7 +182,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 			{
 				APIGroups: []string{""},
 				Resources: []string{"persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch", "delete"},
 			},
 			{
 				APIGroups: []string{""},
@@ -215,6 +213,21 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 				APIGroups: []string{""},
 				Resources: []string{"pods"},
 				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"apps"},
+				Resources: []string{"statefulsets"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
 			},
 		},
 	}
@@ -248,12 +261,17 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 		return nil, fmt.Errorf("failed to find csi-resizer image: %w", err)
 	}
 
+	csiDriverLvmControllerImage, err := imagevector.ImageVector().FindImage("csi-driver-lvm-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find eviction-controller image: %w", err)
+	}
+
 	csiProvisionerImage, err := imagevector.ImageVector().FindImage("csi-provisioner")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find csi-provisioner image: %w", err)
 	}
 
-	var hostPathType corev1.HostPathType = corev1.HostPathDirectoryOrCreate
+	var hostPathType = corev1.HostPathDirectoryOrCreate
 
 	csidriverlvmStatefulsetController := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -301,7 +319,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 						{
 							Name:            "csi-attacher",
 							Image:           csiAttacherImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
@@ -314,7 +332,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 						{
 							Name:            "csi-provisioner",
 							Image:           csiProvisionerImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--feature-gates=Topology=true"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
@@ -327,7 +345,7 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 						{
 							Name:            "csi-resizer",
 							Image:           csiResizerImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
@@ -335,6 +353,48 @@ func (a *actuator) controllerObjects() ([]client.Object, error) {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
+							},
+						},
+						{
+							Name:            "csi-driver-lvm-controller",
+							Image:           csiDriverLvmControllerImage.String(),
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
+							Args:            []string{"--leader-elect", "--health-probe-bind-address=:8081"},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.Pointer(false),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/healthz",
+										Port: intstr.FromInt(8081),
+									},
+								},
+								InitialDelaySeconds: 15,
+								PeriodSeconds:       20,
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/healthz",
+										Port: intstr.FromInt(8081),
+									},
+								},
+								InitialDelaySeconds: 5,
+								PeriodSeconds:       10,
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("500m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("10m"),
+									corev1.ResourceMemory: resource.MustParse("64Mi"),
+								},
 							},
 						},
 					},
@@ -462,11 +522,11 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 		return nil, fmt.Errorf("failed to find csi-driver-lvm-provisioner image: %w", err)
 	}
 
-	var terminationPolicy corev1.TerminationMessagePolicy = corev1.TerminationMessageReadFile
-	var mountPropagation corev1.MountPropagationMode = corev1.MountPropagationBidirectional
+	var terminationPolicy = corev1.TerminationMessageReadFile
+	var mountPropagation = corev1.MountPropagationBidirectional
 
-	var hostPathTypeCreate corev1.HostPathType = corev1.HostPathDirectoryOrCreate
-	var hostPathTypeDir corev1.HostPathType = corev1.HostPathDirectory
+	var hostPathTypeCreate = corev1.HostPathDirectoryOrCreate
+	var hostPathTypeDir = corev1.HostPathDirectory
 
 	csidriverlvmDaemonSetPlugin := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -491,7 +551,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 						{
 							Name:            "csi-node-driver-registrar",
 							Image:           csiNodeDriverRegistrarImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--kubelet-registration-path=/var/lib/kubelet/plugins/csi-driver-lvm/csi.sock"},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(false),
@@ -519,7 +579,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 						{
 							Name:            "csi-driver-lvm-plugin",
 							Image:           csiDriverLvmImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args: []string{
 								"--drivername=lvm.csi.metal-stack.io",
 								"--endpoint=unix:///csi/csi.sock",
@@ -529,7 +589,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 								"--vgname=csi-lvm",
 								"--namespace=kube-system",
 								"--provisionerimage=" + csiDriverLvmProvisionerImage.String(),
-								"--pullpolicy=pullPolicy",
+								"--pullpolicy=" + string(*csidriverlvmConfig.PullPolicy),
 							},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(false),
@@ -582,7 +642,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 						{
 							Name:            "livenessprobe",
 							Image:           livenessprobeImage.String(),
-							ImagePullPolicy: pullPolicy,
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args: []string{
 								"--csi-address=/csi/csi.sock",
 								"--health-port=9898",

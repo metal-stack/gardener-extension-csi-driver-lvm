@@ -1,6 +1,7 @@
 package csidriverlvm
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -18,4 +19,7 @@ type CsiDriverLvmConfig struct {
 
 	// DefaultStorageClass can be set to a name of a storage class deployed by this extension, which will then be marked as the default storage class.
 	DefaultStorageClass *string
+
+	// PullPolicy can be set to adjust the pull policy of the deployed components (development purpose)
+	PullPolicy *corev1.PullPolicy
 }

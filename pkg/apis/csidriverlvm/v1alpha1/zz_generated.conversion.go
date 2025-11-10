@@ -13,6 +13,7 @@ import (
 	unsafe "unsafe"
 
 	csidriverlvm "github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/csidriverlvm"
+	v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -41,6 +42,7 @@ func autoConvert_v1alpha1_CsiDriverLvmConfig_To_csidriverlvm_CsiDriverLvmConfig(
 	out.DevicePattern = (*string)(unsafe.Pointer(in.DevicePattern))
 	out.HostWritePath = (*string)(unsafe.Pointer(in.HostWritePath))
 	out.DefaultStorageClass = (*string)(unsafe.Pointer(in.DefaultStorageClass))
+	out.PullPolicy = (*v1.PullPolicy)(unsafe.Pointer(in.PullPolicy))
 	return nil
 }
 
@@ -53,6 +55,7 @@ func autoConvert_csidriverlvm_CsiDriverLvmConfig_To_v1alpha1_CsiDriverLvmConfig(
 	out.DevicePattern = (*string)(unsafe.Pointer(in.DevicePattern))
 	out.HostWritePath = (*string)(unsafe.Pointer(in.HostWritePath))
 	out.DefaultStorageClass = (*string)(unsafe.Pointer(in.DefaultStorageClass))
+	out.PullPolicy = (*v1.PullPolicy)(unsafe.Pointer(in.PullPolicy))
 	return nil
 }
 

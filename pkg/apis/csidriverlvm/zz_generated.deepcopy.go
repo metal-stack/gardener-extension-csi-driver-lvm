@@ -10,6 +10,7 @@
 package csidriverlvm
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,6 +31,11 @@ func (in *CsiDriverLvmConfig) DeepCopyInto(out *CsiDriverLvmConfig) {
 	if in.DefaultStorageClass != nil {
 		in, out := &in.DefaultStorageClass, &out.DefaultStorageClass
 		*out = new(string)
+		**out = **in
+	}
+	if in.PullPolicy != nil {
+		in, out := &in.PullPolicy, &out.PullPolicy
+		*out = new(v1.PullPolicy)
 		**out = **in
 	}
 	return
