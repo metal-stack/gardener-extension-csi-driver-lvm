@@ -2,7 +2,7 @@ images:
 - name: csi-driver-lvm
   sourceRepository: https://github.com/metal-stack/csi-driver-lvm
   repository:  ghcr.io/metal-stack/csi-driver-lvm
-  tag: "0.7.0"
+  tag: "v0.7.0"
 - name: csi-driver-lvm-provisioner
   sourceRepository: https://github.com/metal-stack/csi-driver-lvm
   repository:  ghcr.io/metal-stack/csi-driver-lvm-provisioner
