@@ -22,4 +22,7 @@ type CsiDriverLvmConfig struct {
 
 	// PullPolicy can be set to adjust the pull policy of the deployed components (development purpose)
 	PullPolicy *corev1.PullPolicy
+
+	// CapacityPollInterval can be set to determine the poll interval of the capacity tracking  (default: 5m)
+	CapacityPollInterval *string
 }

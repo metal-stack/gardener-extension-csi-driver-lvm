@@ -11,6 +11,8 @@ import (
 
 const (
 	ShootCsiDriverLvmResourceName = "extension-csi-driver-lvm"
+
+	capacityPollIntervalDefault = "5m"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -34,6 +36,10 @@ type CsiDriverLvmConfig struct {
 	// PullPolicy can be set to adjust the pull policy of the deployed components (development purpose). Defaults to "IfNotPresent".
 	// +optional
 	PullPolicy *corev1.PullPolicy `json:"pullPolicy,omitempty"`
+
+	// CapacityPollInterval can be set to determine the poll interval of the capacity tracking  (default: 5m)
+	// +optional
+	CapacityPollInterval *string `json:"capacityPollInterval,omitempty"`
 }
 
 func (config *CsiDriverLvmConfig) ConfigureDefaults(hostWritePath *string, devicePattern *string) {
@@ -45,6 +51,9 @@ func (config *CsiDriverLvmConfig) ConfigureDefaults(hostWritePath *string, devic
 	}
 	if config.PullPolicy == nil {
 		config.PullPolicy = ptr.To(corev1.PullIfNotPresent)
+	}
+	if config.CapacityPollInterval == nil {
+		config.CapacityPollInterval = ptr.To(capacityPollIntervalDefault)
 	}
 }
 

@@ -43,6 +43,7 @@ func autoConvert_v1alpha1_CsiDriverLvmConfig_To_csidriverlvm_CsiDriverLvmConfig(
 	out.HostWritePath = (*string)(unsafe.Pointer(in.HostWritePath))
 	out.DefaultStorageClass = (*string)(unsafe.Pointer(in.DefaultStorageClass))
 	out.PullPolicy = (*v1.PullPolicy)(unsafe.Pointer(in.PullPolicy))
+	out.CapacityPollInterval = (*string)(unsafe.Pointer(in.CapacityPollInterval))
 	return nil
 }
 
@@ -56,6 +57,7 @@ func autoConvert_csidriverlvm_CsiDriverLvmConfig_To_v1alpha1_CsiDriverLvmConfig(
 	out.HostWritePath = (*string)(unsafe.Pointer(in.HostWritePath))
 	out.DefaultStorageClass = (*string)(unsafe.Pointer(in.DefaultStorageClass))
 	out.PullPolicy = (*v1.PullPolicy)(unsafe.Pointer(in.PullPolicy))
+	out.CapacityPollInterval = (*string)(unsafe.Pointer(in.CapacityPollInterval))
 	return nil
 }
 

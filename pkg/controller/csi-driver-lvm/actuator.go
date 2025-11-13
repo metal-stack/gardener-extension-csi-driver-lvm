@@ -150,7 +150,6 @@ func (a *actuator) Migrate(ctx context.Context, log logr.Logger, ex *extensionsv
 }
 
 func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
-
 	csidriverlvmServiceAccountController := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "csi-driver-lvm-controller",
@@ -178,6 +177,11 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 				APIGroups: []string{"storage.k8s.io"},
 				Resources: []string{"volumeattachments"},
 				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"csistoragecapacities"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch", "create"},
 			},
 			{
 				APIGroups: []string{""},
@@ -333,13 +337,39 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 							Name:            "csi-provisioner",
 							Image:           csiProvisionerImage.String(),
 							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
-							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--feature-gates=Topology=true"},
+							Args: []string{
+								"--v=5",
+								"--csi-address=/csi/csi.sock",
+								"--feature-gates=Topology=true",
+								"--enable-capacity",
+								"--capacity-poll-interval=" + *csidriverlvmConfig.CapacityPollInterval,
+							},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
 								Privileged:             pointer.Pointer(true),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.namespace",
+										},
+									},
+								},
+								{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.name",
+										},
+									},
+								},
 							},
 						},
 						{
@@ -434,6 +464,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 			VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{"Persistent", "Ephemeral"},
 			PodInfoOnMount:       pointer.Pointer(true),
 			AttachRequired:       pointer.Pointer(false),
+			StorageCapacity:      pointer.Pointer(true),
 		},
 	}
 
@@ -479,6 +510,11 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 				APIGroups: []string{""},
 				Resources: []string{"pods"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods/log"},
+				Verbs:     []string{"get"},
 			},
 		},
 	}

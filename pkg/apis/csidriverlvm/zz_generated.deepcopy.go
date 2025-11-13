@@ -38,6 +38,11 @@ func (in *CsiDriverLvmConfig) DeepCopyInto(out *CsiDriverLvmConfig) {
 		*out = new(v1.PullPolicy)
 		**out = **in
 	}
+	if in.CapacityPollInterval != nil {
+		in, out := &in.CapacityPollInterval, &out.CapacityPollInterval
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
