@@ -301,6 +301,11 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 				Resources: []string{"leases"},
 				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
 			},
+			{
+				APIGroups: []string{"apps"},
+				Resources: []string{"statefulsets"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
 		},
 	}
 
