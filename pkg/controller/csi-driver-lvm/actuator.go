@@ -230,6 +230,7 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 			VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{"Persistent", "Ephemeral"},
 			PodInfoOnMount:       pointer.Pointer(true),
 			AttachRequired:       pointer.Pointer(false),
+			StorageCapacity:      pointer.Pointer(true),
 		},
 	}
 
@@ -305,6 +306,11 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 				APIGroups: []string{"apps"},
 				Resources: []string{"statefulsets"},
 				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"csistoragecapacities"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch", "create", "delete"},
 			},
 		},
 	}
@@ -407,7 +413,42 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 							Name:            "csi-provisioner",
 							Image:           csiProvisionerImage.String(),
 							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
-							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--feature-gates=Topology=true"},
+							Args: []string{
+								"--v=5", "--csi-address=/csi/csi.sock",
+								"--feature-gates=Topology=true",
+								"--enable-capacity",
+								"--node-deployment",
+								"--strict-topology",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "NODE_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "spec.nodeName",
+										},
+									},
+								},
+								{
+									Name: "NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.namespace",
+										},
+									},
+								},
+								{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.name",
+										},
+									},
+								},
+							},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(true),
 								Privileged:             pointer.Pointer(true),
