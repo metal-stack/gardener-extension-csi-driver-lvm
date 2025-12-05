@@ -281,7 +281,7 @@ func (a *actuator) getControllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLv
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
-				Name:      "csi-driver-lvm",
+				Name:      "csi-driver-lvm-controller",
 				Namespace: shootNamespace,
 			},
 		},
