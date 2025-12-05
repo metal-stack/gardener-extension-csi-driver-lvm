@@ -85,8 +85,14 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return fmt.Errorf("unable to get plugin objects: %w", err)
 	}
 
+	controllerObjects, err := a.getControllerObjects(csidriverlvmConfig)
+	if err != nil {
+		return fmt.Errorf("unable to get controller objects: %w", err)
+	}
+
 	objects := []client.Object{}
 	objects = append(objects, pluginObjects...)
+	objects = append(objects, controllerObjects...)
 	objects = append(objects, a.storageClasses(csidriverlvmConfig)...)
 
 	shootResources, err := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer).AddAllAndSerialize(objects...)
@@ -220,6 +226,166 @@ func (a *actuator) storageClasses(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfi
 	return objects
 }
 
+func (a *actuator) getControllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
+	csidriverlvmServiceAccountController := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "csi-driver-lvm-controller",
+			Namespace: shootNamespace,
+		},
+	}
+
+	csidriverlvmClusterRoleController := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "csi-driver-lvm-controller",
+			Namespace: shootNamespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"nodes", "persistentvolumes", "pods"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumeclaims"},
+				Verbs:     []string{"get", "list", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{"apps"},
+				Resources: []string{"statefulsets"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"storageclasses"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"create", "patch"},
+			},
+		},
+	}
+
+	csidriverlvmControllerClusterRoleBinding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "csi-driver-lvm-controller",
+			Namespace: shootNamespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "csi-driver-lvm",
+				Namespace: shootNamespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "csi-driver-lvm-controller",
+		},
+	}
+
+	csiDriverLvmControllerImage, err := imagevector.ImageVector().FindImage("csi-driver-lvm-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find eviction-controller image: %w", err)
+	}
+
+	csidriverlvmDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "csi-driver-lvm-controller",
+			Namespace: shootNamespace,
+			Labels: map[string]string{
+				"app": "csi-driver-lvm-controller",
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(int32(1)),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "csi-driver-lvm-controller",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "csi-driver-lvm-controller",
+					},
+				},
+				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
+					ServiceAccountName:            "csi-driver-lvm-controller",
+					TerminationGracePeriodSeconds: ptr.To(int64(10)),
+					Containers: []corev1.Container{
+						{
+							Name:            "csi-driver-lvm-controller",
+							Image:           csiDriverLvmControllerImage.String(),
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
+							Args:            []string{"--leader-elect", "--health-probe-bind-address=:8081"},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.Pointer(false),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/healthz",
+										Port: intstr.FromInt(8081),
+									},
+								},
+								InitialDelaySeconds: 15,
+								PeriodSeconds:       20,
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/healthz",
+										Port: intstr.FromInt(8081),
+									},
+								},
+								InitialDelaySeconds: 5,
+								PeriodSeconds:       10,
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("500m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("10m"),
+									corev1.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	objects := []client.Object{
+		csidriverlvmServiceAccountController,
+		csidriverlvmClusterRoleController,
+		csidriverlvmControllerClusterRoleBinding,
+		csidriverlvmDeployment,
+	}
+
+	return objects, nil
+}
+
 func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
 	csidriverlvmDriver := &storagev1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
@@ -268,16 +434,6 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 				Verbs:     []string{"list", "watch", "update", "patch", "create"},
 			},
 			{
-				APIGroups: []string{""},
-				Resources: []string{"nodes"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"pods"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-			{
 				APIGroups: []string{"storage.k8s.io"},
 				Resources: []string{"volumeattachments"},
 				Verbs:     []string{"get", "list", "watch", "update", "patch"},
@@ -296,16 +452,6 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 				APIGroups: []string{"storage.k8s.io"},
 				Resources: []string{"volumeattachments/status"},
 				Verbs:     []string{"patch"},
-			},
-			{
-				APIGroups: []string{"coordination.k8s.io"},
-				Resources: []string{"leases"},
-				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
-			},
-			{
-				APIGroups: []string{"apps"},
-				Resources: []string{"statefulsets"},
-				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
 				APIGroups: []string{"storage.k8s.io"},
@@ -357,11 +503,6 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 	csiResizerImage, err := imagevector.ImageVector().FindImage("csi-resizer")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find csi-resizer image: %w", err)
-	}
-
-	csiDriverLvmControllerImage, err := imagevector.ImageVector().FindImage("csi-driver-lvm-controller")
-	if err != nil {
-		return nil, fmt.Errorf("failed to find eviction-controller image: %w", err)
 	}
 
 	csiProvisionerImage, err := imagevector.ImageVector().FindImage("csi-provisioner")
@@ -468,48 +609,6 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{MountPath: "/csi", Name: "socket-dir"},
-							},
-						},
-						{
-							Name:            "csi-driver-lvm-controller",
-							Image:           csiDriverLvmControllerImage.String(),
-							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
-							Args:            []string{"--leader-elect", "--health-probe-bind-address=:8081"},
-							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: pointer.Pointer(false),
-								Capabilities: &corev1.Capabilities{
-									Drop: []corev1.Capability{"ALL"},
-								},
-							},
-							LivenessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/healthz",
-										Port: intstr.FromInt(8081),
-									},
-								},
-								InitialDelaySeconds: 15,
-								PeriodSeconds:       20,
-							},
-							ReadinessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/healthz",
-										Port: intstr.FromInt(8081),
-									},
-								},
-								InitialDelaySeconds: 5,
-								PeriodSeconds:       10,
-							},
-							Resources: corev1.ResourceRequirements{
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("500m"),
-									corev1.ResourceMemory: resource.MustParse("128Mi"),
-								},
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("10m"),
-									corev1.ResourceMemory: resource.MustParse("64Mi"),
-								},
 							},
 						},
 						// plugin
