@@ -80,19 +80,19 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, ex *extension
 		return fmt.Errorf("assuming csi-lvm is still present due to existing storage class; csi-driver-lvm cannot run while csi-lvm is still deployed")
 	}
 
-	controllerObjects, err := a.controllerObjects(csidriverlvmConfig)
+	pluginObjects, err := a.getPluginObjects(csidriverlvmConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get plugin objects: %w", err)
 	}
 
-	pluginObjects, err := a.pluginObjects(csidriverlvmConfig)
+	controllerObjects, err := a.getControllerObjects(csidriverlvmConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get controller objects: %w", err)
 	}
 
 	objects := []client.Object{}
-	objects = append(objects, controllerObjects...)
 	objects = append(objects, pluginObjects...)
+	objects = append(objects, controllerObjects...)
 	objects = append(objects, a.storageClasses(csidriverlvmConfig)...)
 
 	shootResources, err := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer).AddAllAndSerialize(objects...)
@@ -149,8 +149,84 @@ func (a *actuator) Migrate(ctx context.Context, log logr.Logger, ex *extensionsv
 	return nil
 }
 
-func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
+func (a *actuator) storageClasses(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) []client.Object {
+	var (
+		csidriverlvmLinearStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi-driver-lvm-linear",
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "linear",
+			},
+		}
 
+		csidriverlvmMirrorStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi-driver-lvm-mirror",
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "mirror",
+			},
+		}
+
+		csidriverlvmStripedStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi-driver-lvm-striped",
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "striped",
+			},
+		}
+
+		csidriverlvmDefaultStorageClass = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: oldName,
+			},
+			Provisioner:          "lvm.csi.metal-stack.io",
+			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			AllowVolumeExpansion: pointer.Pointer(true),
+			Parameters: map[string]string{
+				"type": "linear",
+			},
+		}
+
+		storageClasses = []*storagev1.StorageClass{
+			csidriverlvmDefaultStorageClass,
+			csidriverlvmLinearStorageClass,
+			csidriverlvmMirrorStorageClass,
+			csidriverlvmStripedStorageClass,
+		}
+
+		objects []client.Object
+	)
+
+	// set default storageclass
+	for _, sc := range storageClasses {
+		if csidriverlvmConfig.DefaultStorageClass != nil && *csidriverlvmConfig.DefaultStorageClass == sc.Name {
+			if sc.Annotations == nil {
+				sc.Annotations = map[string]string{}
+			}
+			sc.Annotations["storageclass.kubernetes.io/is-default-class"] = "true"
+		}
+		objects = append(objects, sc)
+	}
+	return objects
+}
+
+func (a *actuator) getControllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
 	csidriverlvmServiceAccountController := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "csi-driver-lvm-controller",
@@ -166,57 +242,22 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{""},
-				Resources: []string{"persistentvolumes"},
-				Verbs:     []string{"get", "list", "watch", "update", "patch", "create", "delete"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"csinodes"},
+				Resources: []string{"nodes", "persistentvolumes", "pods"},
 				Verbs:     []string{"get", "list", "watch"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"volumeattachments"},
-				Verbs:     []string{"get", "list", "watch", "update", "patch"},
 			},
 			{
 				APIGroups: []string{""},
 				Resources: []string{"persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch", "update", "patch", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"persistentvolumeclaims/status"},
-				Verbs:     []string{"update", "patch"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"storageclasses"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"events"},
-				Verbs:     []string{"get", "list", "watch", "update", "patch", "create", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"nodes"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"volumeattachments/status"},
-				Verbs:     []string{"patch"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"pods"},
-				Verbs:     []string{"get", "list", "watch"},
+				Verbs:     []string{"get", "list", "watch", "delete"},
 			},
 			{
 				APIGroups: []string{"apps"},
 				Resources: []string{"statefulsets"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"storageclasses"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
@@ -226,13 +267,13 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 			},
 			{
 				APIGroups: []string{""},
-				Resources: []string{"configmaps"},
-				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+				Resources: []string{"events"},
+				Verbs:     []string{"create", "patch"},
 			},
 		},
 	}
 
-	csidriverlvmClusterRoleBindingController := &rbacv1.ClusterRoleBinding{
+	csidriverlvmControllerClusterRoleBinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "csi-driver-lvm-controller",
 			Namespace: shootNamespace,
@@ -251,38 +292,21 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 		},
 	}
 
-	csiAttacherImage, err := imagevector.ImageVector().FindImage("csi-attacher")
-	if err != nil {
-		return nil, fmt.Errorf("failed to find csi-attacher image: %w", err)
-	}
-
-	csiResizerImage, err := imagevector.ImageVector().FindImage("csi-resizer")
-	if err != nil {
-		return nil, fmt.Errorf("failed to find csi-resizer image: %w", err)
-	}
-
 	csiDriverLvmControllerImage, err := imagevector.ImageVector().FindImage("csi-driver-lvm-controller")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find eviction-controller image: %w", err)
 	}
 
-	csiProvisionerImage, err := imagevector.ImageVector().FindImage("csi-provisioner")
-	if err != nil {
-		return nil, fmt.Errorf("failed to find csi-provisioner image: %w", err)
-	}
-
-	var hostPathType = corev1.HostPathDirectoryOrCreate
-
-	csidriverlvmStatefulsetController := &appsv1.StatefulSet{
+	csidriverlvmDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "csi-driver-lvm-controller",
-			Namespace:   shootNamespace,
-			Annotations: map[string]string{},
-			Labels:      map[string]string{},
+			Name:      "csi-driver-lvm-controller",
+			Namespace: shootNamespace,
+			Labels: map[string]string{
+				"app": "csi-driver-lvm-controller",
+			},
 		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas:    ptr.To(int32(1)),
-			ServiceName: "csi-driver-lvm-controller",
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(int32(1)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "csi-driver-lvm-controller",
@@ -293,68 +317,17 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 					Labels: map[string]string{
 						"app": "csi-driver-lvm-controller",
 					},
-					Annotations: map[string]string{},
 				},
 				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						PodAntiAffinity: &corev1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "app",
-												Operator: "In",
-												Values:   []string{"csi-driver-lvm-controller"},
-											},
-										},
-									},
-									TopologyKey: "kubernetes.io/hostname",
-								},
-							},
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
 					},
-					ServiceAccountName: "csi-driver-lvm-controller",
+					ServiceAccountName:            "csi-driver-lvm-controller",
+					TerminationGracePeriodSeconds: ptr.To(int64(10)),
 					Containers: []corev1.Container{
-						{
-							Name:            "csi-attacher",
-							Image:           csiAttacherImage.String(),
-							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
-							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
-							SecurityContext: &corev1.SecurityContext{
-								ReadOnlyRootFilesystem: pointer.Pointer(true),
-								Privileged:             pointer.Pointer(true),
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{MountPath: "/csi", Name: "socket-dir"},
-							},
-						},
-						{
-							Name:            "csi-provisioner",
-							Image:           csiProvisionerImage.String(),
-							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
-							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock", "--feature-gates=Topology=true"},
-							SecurityContext: &corev1.SecurityContext{
-								ReadOnlyRootFilesystem: pointer.Pointer(true),
-								Privileged:             pointer.Pointer(true),
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{MountPath: "/csi", Name: "socket-dir"},
-							},
-						},
-						{
-							Name:            "csi-resizer",
-							Image:           csiResizerImage.String(),
-							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
-							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
-							SecurityContext: &corev1.SecurityContext{
-								ReadOnlyRootFilesystem: pointer.Pointer(true),
-								Privileged:             pointer.Pointer(true),
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{MountPath: "/csi", Name: "socket-dir"},
-							},
-						},
 						{
 							Name:            "csi-driver-lvm-controller",
 							Image:           csiDriverLvmControllerImage.String(),
@@ -398,17 +371,6 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "socket-dir",
-							VolumeSource: corev1.VolumeSource{
-								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/var/lib/kubelet/plugins/csi-driver-lvm",
-									Type: &hostPathType,
-								},
-							},
-						},
-					},
 				},
 			},
 		},
@@ -417,14 +379,14 @@ func (a *actuator) controllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCo
 	objects := []client.Object{
 		csidriverlvmServiceAccountController,
 		csidriverlvmClusterRoleController,
-		csidriverlvmClusterRoleBindingController,
-		csidriverlvmStatefulsetController,
+		csidriverlvmControllerClusterRoleBinding,
+		csidriverlvmDeployment,
 	}
 
 	return objects, nil
 }
 
-func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
+func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) ([]client.Object, error) {
 	csidriverlvmDriver := &storagev1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "csi-driver-lvm",
@@ -434,19 +396,20 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 			VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{"Persistent", "Ephemeral"},
 			PodInfoOnMount:       pointer.Pointer(true),
 			AttachRequired:       pointer.Pointer(false),
+			StorageCapacity:      pointer.Pointer(true),
 		},
 	}
 
-	csidriverlvmServiceAccountPlugin := &corev1.ServiceAccount{
+	csidriverlvmServiceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "csi-driver-lvm-plugin",
+			Name:      "csi-driver-lvm",
 			Namespace: shootNamespace,
 		},
 	}
 
-	csidriverlvmClusterRolePlugin := &rbacv1.ClusterRole{
+	csidriverlvmClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "csi-driver-lvm-plugin",
+			Name:      "csi-driver-lvm",
 			Namespace: shootNamespace,
 		},
 		Rules: []rbacv1.PolicyRule{
@@ -458,7 +421,7 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 			{
 				APIGroups: []string{""},
 				Resources: []string{"persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
 			},
 			{
 				APIGroups: []string{""},
@@ -471,34 +434,54 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 				Verbs:     []string{"list", "watch", "update", "patch", "create"},
 			},
 			{
-				APIGroups: []string{""},
-				Resources: []string{"nodes"},
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"volumeattachments"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"storageclasses"},
 				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"csinodes"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"volumeattachments/status"},
+				Verbs:     []string{"patch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"csistoragecapacities"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch", "create", "delete"},
 			},
 			{
 				APIGroups: []string{""},
 				Resources: []string{"pods"},
-				Verbs:     []string{"get", "list", "watch", "create", "delete"},
+				Verbs:     []string{"get", "list", "watch"},
 			},
 		},
 	}
 
-	csidriverlvmClusterRoleBindingPlugin := &rbacv1.ClusterRoleBinding{
+	csidriverlvmClusterRoleBinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "csi-driver-lvm-plugin",
+			Name:      "csi-driver-lvm",
 			Namespace: shootNamespace,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
-				Name:      "csi-driver-lvm-plugin",
+				Name:      "csi-driver-lvm",
 				Namespace: shootNamespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "csi-driver-lvm-plugin",
+			Name:     "csi-driver-lvm",
 		},
 	}
 
@@ -517,9 +500,19 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 		return nil, fmt.Errorf("failed to find csi-driver-lvm image: %w", err)
 	}
 
-	csiDriverLvmProvisionerImage, err := imagevector.ImageVector().FindImage("csi-driver-lvm-provisioner")
+	csiAttacherImage, err := imagevector.ImageVector().FindImage("csi-attacher")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find csi-driver-lvm-provisioner image: %w", err)
+		return nil, fmt.Errorf("failed to find csi-attacher image: %w", err)
+	}
+
+	csiResizerImage, err := imagevector.ImageVector().FindImage("csi-resizer")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find csi-resizer image: %w", err)
+	}
+
+	csiProvisionerImage, err := imagevector.ImageVector().FindImage("csi-provisioner")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find csi-provisioner image: %w", err)
 	}
 
 	var terminationPolicy = corev1.TerminationMessageReadFile
@@ -528,26 +521,102 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 	var hostPathTypeCreate = corev1.HostPathDirectoryOrCreate
 	var hostPathTypeDir = corev1.HostPathDirectory
 
-	csidriverlvmDaemonSetPlugin := &appsv1.DaemonSet{
+	csidriverlvmDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "csi-driver-lvm-plugin",
+			Name:      "csi-driver-lvm",
 			Namespace: shootNamespace,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			RevisionHistoryLimit: ptr.To(int32(10)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "csi-driver-lvm-plugin",
+					"app": "csi-driver-lvm",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "csi-driver-lvm-plugin",
+						"app": "csi-driver-lvm",
 					},
 				}, Spec: corev1.PodSpec{
-					ServiceAccountName: "csi-driver-lvm-plugin",
+					ServiceAccountName: "csi-driver-lvm",
 					Containers: []corev1.Container{
+						// controller
+						{
+							Name:            "csi-attacher",
+							Image:           csiAttacherImage.String(),
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
+							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
+							SecurityContext: &corev1.SecurityContext{
+								ReadOnlyRootFilesystem: pointer.Pointer(true),
+								Privileged:             pointer.Pointer(true),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{MountPath: "/csi", Name: "socket-dir"},
+							},
+						},
+						{
+							Name:            "csi-provisioner",
+							Image:           csiProvisionerImage.String(),
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
+							Args: []string{
+								"--v=5", "--csi-address=/csi/csi.sock",
+								"--feature-gates=Topology=true",
+								"--enable-capacity",
+								"--node-deployment",
+								"--strict-topology",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "NODE_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "spec.nodeName",
+										},
+									},
+								},
+								{
+									Name: "NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.namespace",
+										},
+									},
+								},
+								{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.name",
+										},
+									},
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								ReadOnlyRootFilesystem: pointer.Pointer(true),
+								Privileged:             pointer.Pointer(true),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{MountPath: "/csi", Name: "socket-dir"},
+							},
+						},
+						{
+							Name:            "csi-resizer",
+							Image:           csiResizerImage.String(),
+							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
+							Args:            []string{"--v=5", "--csi-address=/csi/csi.sock"},
+							SecurityContext: &corev1.SecurityContext{
+								ReadOnlyRootFilesystem: pointer.Pointer(true),
+								Privileged:             pointer.Pointer(true),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{MountPath: "/csi", Name: "socket-dir"},
+							},
+						},
+						// plugin
 						{
 							Name:            "csi-node-driver-registrar",
 							Image:           csiNodeDriverRegistrarImage.String(),
@@ -582,14 +651,11 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 							ImagePullPolicy: *csidriverlvmConfig.PullPolicy,
 							Args: []string{
 								"--drivername=lvm.csi.metal-stack.io",
-								"--endpoint=unix:///csi/csi.sock",
+								"--endpoint=/csi/csi.sock",
 								"--hostwritepath=" + pointer.SafeDeref(csidriverlvmConfig.HostWritePath),
 								"--devices=" + pointer.SafeDeref(csidriverlvmConfig.DevicePattern),
 								"--nodeid=$(KUBE_NODE_NAME)",
 								"--vgname=csi-lvm",
-								"--namespace=kube-system",
-								"--provisionerimage=" + csiDriverLvmProvisionerImage.String(),
-								"--pullpolicy=" + string(*csidriverlvmConfig.PullPolicy),
 							},
 							SecurityContext: &corev1.SecurityContext{
 								ReadOnlyRootFilesystem: pointer.Pointer(false),
@@ -755,92 +821,13 @@ func (a *actuator) pluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig
 
 	objects := []client.Object{
 		csidriverlvmDriver,
-		csidriverlvmServiceAccountPlugin,
-		csidriverlvmClusterRolePlugin,
-		csidriverlvmClusterRoleBindingPlugin,
-		csidriverlvmDaemonSetPlugin,
+		csidriverlvmServiceAccount,
+		csidriverlvmClusterRole,
+		csidriverlvmClusterRoleBinding,
+		csidriverlvmDaemonSet,
 	}
 
 	return objects, nil
-}
-
-func (a *actuator) storageClasses(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfig) []client.Object {
-	var (
-		csidriverlvmLinearStorageClass = &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "csi-driver-lvm-linear",
-			},
-			Provisioner:          "lvm.csi.metal-stack.io",
-			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
-			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
-			AllowVolumeExpansion: pointer.Pointer(true),
-			Parameters: map[string]string{
-				"type": "linear",
-			},
-		}
-
-		csidriverlvmMirrorStorageClass = &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "csi-driver-lvm-mirror",
-			},
-			Provisioner:          "lvm.csi.metal-stack.io",
-			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
-			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
-			AllowVolumeExpansion: pointer.Pointer(true),
-			Parameters: map[string]string{
-				"type": "mirror",
-			},
-		}
-
-		csidriverlvmStripedStorageClass = &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "csi-driver-lvm-striped",
-			},
-			Provisioner:          "lvm.csi.metal-stack.io",
-			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
-			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
-			AllowVolumeExpansion: pointer.Pointer(true),
-			Parameters: map[string]string{
-				"type": "striped",
-			},
-		}
-
-		csidriverlvmDefaultStorageClass = &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: oldName,
-			},
-			Provisioner:          "lvm.csi.metal-stack.io",
-			ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
-			VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
-			AllowVolumeExpansion: pointer.Pointer(true),
-			Parameters: map[string]string{
-				"type": "linear",
-			},
-		}
-
-		storageClasses = []*storagev1.StorageClass{
-			csidriverlvmDefaultStorageClass,
-			csidriverlvmLinearStorageClass,
-			csidriverlvmMirrorStorageClass,
-			csidriverlvmStripedStorageClass,
-		}
-
-		objects []client.Object
-	)
-
-	for _, sc := range storageClasses {
-		if csidriverlvmConfig.DefaultStorageClass != nil && *csidriverlvmConfig.DefaultStorageClass == sc.Name {
-			if sc.Annotations == nil {
-				sc.Annotations = map[string]string{}
-			}
-
-			sc.Annotations["storageclass.kubernetes.io/is-default-class"] = "true"
-		}
-
-		objects = append(objects, sc)
-	}
-
-	return objects
 }
 
 func (a *actuator) isOldCsiLvmExisting(ctx context.Context, shootNamespace string) (bool, error) {
