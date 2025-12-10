@@ -458,6 +458,11 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 				Resources: []string{"csistoragecapacities"},
 				Verbs:     []string{"get", "list", "watch", "update", "patch", "create", "delete"},
 			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
 		},
 	}
 
