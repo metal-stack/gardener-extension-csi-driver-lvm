@@ -315,7 +315,9 @@ func (a *actuator) getControllerObjects(csidriverlvmConfig *v1alpha1.CsiDriverLv
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "csi-driver-lvm-controller",
+						"app":                                    "csi-driver-lvm-controller",
+						"networking.gardener.cloud/to-apiserver": "allowed",
+						"networking.gardener.cloud/to-dns":       "allowed",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -536,7 +538,9 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "csi-driver-lvm",
+						"app":                                    "csi-driver-lvm",
+						"networking.gardener.cloud/to-apiserver": "allowed",
+						"networking.gardener.cloud/to-dns":       "allowed",
 					},
 				}, Spec: corev1.PodSpec{
 					ServiceAccountName: "csi-driver-lvm",
