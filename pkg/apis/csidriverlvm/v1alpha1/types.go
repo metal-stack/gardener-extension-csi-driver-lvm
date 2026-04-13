@@ -34,6 +34,21 @@ type CsiDriverLvmConfig struct {
 	// PullPolicy can be set to adjust the pull policy of the deployed components (development purpose). Defaults to "IfNotPresent".
 	// +optional
 	PullPolicy *corev1.PullPolicy `json:"pullPolicy,omitempty"`
+
+	// Encryption enables encrypted StorageClass variants (linear-encrypted,
+	// mirror-encrypted, striped-encrypted). When set, the extension creates
+	// additional StorageClasses that reference a user-provided LUKS key Secret
+	// living in the shoot cluster. The user is responsible for creating and
+	// rotating that Secret; the extension never reads or manages its contents.
+	// +optional
+	Encryption *EncryptionConfig `json:"encryption,omitempty"`
+}
+
+// EncryptionConfig configures LUKS-encrypted StorageClass variants.
+type EncryptionConfig struct {
+	// SecretRef points to a Secret in the shoot cluster holding the LUKS key
+	// material. Both Name and Namespace are required.
+	SecretRef corev1.SecretReference `json:"secretRef"`
 }
 
 func (config *CsiDriverLvmConfig) ConfigureDefaults(hostWritePath *string, devicePattern *string) {
@@ -70,6 +85,13 @@ func (config *CsiDriverLvmConfig) IsValid(log logr.Logger) bool {
 	if !hasValidHostWritePath {
 		log.Info("hostWritePath is not absolute")
 		return false
+	}
+
+	if config.Encryption != nil {
+		if config.Encryption.SecretRef.Name == "" || config.Encryption.SecretRef.Namespace == "" {
+			log.Info("encryption.secretRef.name and encryption.secretRef.namespace must both be set")
+			return false
+		}
 	}
 
 	return true

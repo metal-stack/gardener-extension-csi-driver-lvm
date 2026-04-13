@@ -22,4 +22,16 @@ type CsiDriverLvmConfig struct {
 
 	// PullPolicy can be set to adjust the pull policy of the deployed components (development purpose)
 	PullPolicy *corev1.PullPolicy
+
+	// Encryption enables encrypted StorageClass variants (linear-encrypted,
+	// mirror-encrypted, striped-encrypted). When set, the extension creates
+	// additional StorageClasses that reference a user-provided LUKS key Secret
+	// living in the shoot cluster.
+	Encryption *EncryptionConfig
+}
+
+// EncryptionConfig configures LUKS-encrypted StorageClass variants.
+type EncryptionConfig struct {
+	// SecretRef points to a Secret in the shoot cluster holding the LUKS key material.
+	SecretRef corev1.SecretReference
 }
