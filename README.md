@@ -12,7 +12,66 @@ The following storage classes will be created by default:
 - `csi-driver-lvm-striped` for striped volumes for improved performance on multiple physical volumes
 - `csi-lvm` for backwards compatibility with type linear.
 
+When encryption is enabled (see below), three additional LUKS-encrypted storage classes are created:
+
+- `csi-driver-lvm-linear-encrypted`
+- `csi-driver-lvm-mirror-encrypted`
+- `csi-driver-lvm-striped-encrypted`
+
 See [docs/migration.md](./docs/migration.md) for further information about migrating from `csi-lvm` to `csi-driver-lvm`.
+
+## LUKS Encryption
+
+LUKS block-device encryption can be enabled per shoot by adding an `encryption` field to the `providerConfig`. When set, the three encrypted storage classes above are created. Each class instructs the CSI node plugin to open the LUKS device using a key read from a Secret in the shoot cluster.
+
+### Setup
+
+1. Create the LUKS key Secret in the shoot cluster:
+
+   ```sh
+   kubectl -n <namespace> create secret generic csi-lvm-encryption-secret \
+     --from-literal=passphrase="$(openssl rand -base64 32)"
+   ```
+
+   > **Important:** This Secret is part of your cluster's recovery data. Back it up securely. Losing it makes encrypted volumes permanently inaccessible.
+
+2. Reference the Secret in the shoot's `providerConfig`:
+
+   ```yaml
+   extensions:
+   - type: csi-driver-lvm
+     providerConfig:
+       apiVersion: csi-driver-lvm.metal.extensions.gardener.cloud/v1alpha1
+       kind: CsiDriverLvmConfig
+       devicePattern: /dev/nvme[0-9]n[0-9]
+       hostWritePath: /etc/lvm
+       encryption:
+         secretRef:
+           name: csi-lvm-encryption-secret
+           namespace: <namespace>
+   ```
+
+3. Create a PVC using one of the encrypted storage classes:
+
+   ```yaml
+   apiVersion: v1
+   kind: PersistentVolumeClaim
+   metadata:
+     name: my-encrypted-pvc
+   spec:
+     accessModes: [ReadWriteOnce]
+     storageClassName: csi-driver-lvm-linear-encrypted
+     resources:
+       requests:
+         storage: 10Gi
+   ```
+
+### Notes
+
+- Both `secretRef.name` and `secretRef.namespace` are required when `encryption` is set; the extension will refuse to reconcile with either field empty.
+- The Secret is user-owned and is not managed by the extension. It will not be deleted or overwritten during reconciliation.
+- `StorageClass.parameters` are immutable in Kubernetes. If you need to change the secret reference, delete the encrypted storage classes manually and allow the extension to recreate them.
+- Removing `encryption` from `providerConfig` deletes the encrypted storage classes but does **not** affect existing PVCs or the underlying LUKS devices.
 
 ## Development
 
@@ -29,4 +88,3 @@ sudo losetup -a
 1. The extension's docker image can be pushed into Kind using `make push-to-gardener-local`
 1. Install the extension `kubectl apply -k example/`
 1. Parametrize the `example/shoot.yaml` and apply with `kubectl -f example/shoot.yaml`
-

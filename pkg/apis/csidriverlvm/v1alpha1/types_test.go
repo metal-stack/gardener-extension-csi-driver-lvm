@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -96,6 +97,42 @@ func TestConfig(t *testing.T) {
 				HostWritePath: ptr.To("/etc/lvm"),
 			},
 			valid: true,
+		},
+		{
+			desc: "test valid config with encryption",
+			customData: &CsiDriverLvmConfig{
+				DevicePattern: ptr.To("/dev/loop10[0,1]"),
+				HostWritePath: ptr.To("/etc/lvm"),
+				Encryption: &EncryptionConfig{
+					SecretRef: corev1.SecretReference{
+						Name:      "csi-lvm-encryption-secret",
+						Namespace: "default",
+					},
+				},
+			},
+			valid: true,
+		},
+		{
+			desc: "test encryption missing secret name",
+			customData: &CsiDriverLvmConfig{
+				DevicePattern: ptr.To("/dev/loop10[0,1]"),
+				HostWritePath: ptr.To("/etc/lvm"),
+				Encryption: &EncryptionConfig{
+					SecretRef: corev1.SecretReference{Namespace: "default"},
+				},
+			},
+			valid: false,
+		},
+		{
+			desc: "test encryption missing secret namespace",
+			customData: &CsiDriverLvmConfig{
+				DevicePattern: ptr.To("/dev/loop10[0,1]"),
+				HostWritePath: ptr.To("/etc/lvm"),
+				Encryption: &EncryptionConfig{
+					SecretRef: corev1.SecretReference{Name: "csi-lvm-encryption-secret"},
+				},
+			},
+			valid: false,
 		},
 	}
 

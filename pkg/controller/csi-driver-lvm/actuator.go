@@ -213,6 +213,47 @@ func (a *actuator) storageClasses(csidriverlvmConfig *v1alpha1.CsiDriverLvmConfi
 		objects []client.Object
 	)
 
+	if csidriverlvmConfig.Encryption != nil {
+		secretName := csidriverlvmConfig.Encryption.SecretRef.Name
+		secretNs := csidriverlvmConfig.Encryption.SecretRef.Namespace
+
+		encryptedParams := func(t string) map[string]string {
+			return map[string]string{
+				"type":       t,
+				"encryption": "true",
+				"csi.storage.k8s.io/node-stage-secret-name":      secretName,
+				"csi.storage.k8s.io/node-stage-secret-namespace": secretNs,
+			}
+		}
+
+		storageClasses = append(storageClasses,
+			&storagev1.StorageClass{
+				ObjectMeta:           metav1.ObjectMeta{Name: "csi-driver-lvm-linear-encrypted"},
+				Provisioner:          "lvm.csi.metal-stack.io",
+				ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+				VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+				AllowVolumeExpansion: pointer.Pointer(true),
+				Parameters:           encryptedParams("linear"),
+			},
+			&storagev1.StorageClass{
+				ObjectMeta:           metav1.ObjectMeta{Name: "csi-driver-lvm-mirror-encrypted"},
+				Provisioner:          "lvm.csi.metal-stack.io",
+				ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+				VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+				AllowVolumeExpansion: pointer.Pointer(true),
+				Parameters:           encryptedParams("mirror"),
+			},
+			&storagev1.StorageClass{
+				ObjectMeta:           metav1.ObjectMeta{Name: "csi-driver-lvm-striped-encrypted"},
+				Provisioner:          "lvm.csi.metal-stack.io",
+				ReclaimPolicy:        ptr.To(corev1.PersistentVolumeReclaimDelete),
+				VolumeBindingMode:    ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+				AllowVolumeExpansion: pointer.Pointer(true),
+				Parameters:           encryptedParams("striped"),
+			},
+		)
+	}
+
 	// set default storageclass
 	for _, sc := range storageClasses {
 		if csidriverlvmConfig.DefaultStorageClass != nil && *csidriverlvmConfig.DefaultStorageClass == sc.Name {
@@ -707,6 +748,7 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 								{MountPath: "/etc/lvm/cache", Name: "lvmcache", MountPropagation: &mountPropagation},
 								{MountPath: "/etc/lvm/archive", Name: "lvmarchive", MountPropagation: &mountPropagation},
 								{MountPath: "/etc/lvm/lock", Name: "lvmlock", MountPropagation: &mountPropagation},
+								{MountPath: "/run/cryptsetup", Name: "cryptsetup-run"},
 							},
 						},
 						{
@@ -814,6 +856,14 @@ func (a *actuator) getPluginObjects(csidriverlvmConfig *v1alpha1.CsiDriverLvmCon
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: pointer.SafeDeref(csidriverlvmConfig.HostWritePath) + "/lock",
 									Type: &hostPathTypeCreate,
+								},
+							},
+						},
+						{
+							Name: "cryptsetup-run",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{
+									Medium: corev1.StorageMediumMemory,
 								},
 							},
 						},
