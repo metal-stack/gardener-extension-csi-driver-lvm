@@ -30,7 +30,7 @@ LUKS block-device encryption can be enabled per shoot by adding an `encryption` 
 
    ```sh
    kubectl -n <namespace> create secret generic csi-lvm-encryption-secret \
-     --from-literal=encryptionKey="$(openssl rand -base64 32)"
+     --from-literal=passphrase="$(openssl rand -base64 32)"
    ```
 
    > **Important:** This Secret is part of your cluster's recovery data. Back it up securely. Losing it makes encrypted volumes permanently inaccessible.
@@ -88,4 +88,3 @@ sudo losetup -a
 1. The extension's docker image can be pushed into Kind using `make push-to-gardener-local`
 1. Install the extension `kubectl apply -k example/`
 1. Parametrize the `example/shoot.yaml` and apply with `kubectl -f example/shoot.yaml`
-
