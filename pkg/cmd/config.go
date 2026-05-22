@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 
-	healthcheckconfig "github.com/gardener/gardener/extensions/pkg/apis/config"
+	healthcheckconfig "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	configapi "github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/config"
 	"github.com/metal-stack/gardener-extension-csi-driver-lvm/pkg/apis/config/v1alpha1"
 
