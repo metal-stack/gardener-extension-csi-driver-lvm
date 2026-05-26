@@ -1,6 +1,6 @@
 module github.com/metal-stack/gardener-extension-csi-driver-lvm
 
-go 1.24.5
+go 1.26
 
 require (
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
