@@ -1,9 +1,15 @@
 # gardener-extension-csi-driver-lvm
 
-Provides a Gardener extension for managing [csi-driver-lvm](https://github.com/metal-stack/csi-driver-lvm) for a shoot cluster.
+[![GitHub License](https://img.shields.io/github/license/metal-stack/gardener-extension-csi-driver-lvm)](https://github.com/metal-stack/gardener-extension-csi-driver-lvm/blob/main/LICENSE)
+[![Build](https://github.com/metal-stack/gardener-extension-csi-driver-lvm/actions/workflows/build.yaml/badge.svg)](https://github.com/metal-stack/gardener-extension-csi-driver-lvm/actions/workflows/build.yaml)
+
+[Project Gardener](https://gardener.cloud/) implements the automated management and operation of [Kubernetes](https://kubernetes.io/) clusters as a service. This controller implements Gardener's extension contract for providing **[csi-driver-lvm](https://github.com/metal-stack/csi-driver-lvm)** in a shoot cluster.
+
+It reconciles the `Extension` resources of `type: csi-driver-lvm`.
+
+For more detailed documentation about the extension contract, please refer to the [Gardener docs](https://github.com/gardener/gardener/blob/master/docs/extensions/overview.md).
 
 As a safety measurement, the extension checks for the old [csi-lvm](https://github.com/metal-stack/csi-lvm/tree/master) and stops reconciling if the old driver is still available.
-If not the extension will reconcile the new `csi-driver-lvm`.
 
 The following storage classes will be created by default:
 
@@ -19,6 +25,10 @@ When encryption is enabled (see below), three additional LUKS-encrypted storage 
 - `csi-driver-lvm-striped-encrypted`
 
 See [docs/migration.md](./docs/migration.md) for further information about migrating from `csi-lvm` to `csi-driver-lvm`.
+
+## Example
+
+An example `ControllerRegistration` resource that can be used to register this controller to Gardener can be found [here](example/controller-registration.yaml).
 
 ## LUKS Encryption
 
@@ -88,3 +98,7 @@ sudo losetup -a
 1. The extension's docker image can be pushed into Kind using `make push-to-gardener-local`
 1. Install the extension `kubectl apply -k example/`
 1. Parametrize the `example/shoot.yaml` and apply with `kubectl -f example/shoot.yaml`
+
+## Feedback and Support
+
+Feedback and contributions are always welcome! Please report bugs or suggestions as [GitHub issues](https://github.com/metal-stack/gardener-extension-csi-driver-lvm/issues) or reach out to our [community](https://metal-stack.io/community).
